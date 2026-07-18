@@ -1,4 +1,16 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Debugging Arena — Working Title
+
+Temporary descriptive title. This education prototype turns frontend accessibility failures into playable debugging missions. **Keyboard Trap Boss** repairs a broken modal, evaluates rendered behavior, and converts passing objectives into boss damage.
+
+## Run locally
+
+Use `npm run dev`. Verify with `npm run lint`, `npm run typecheck`, `npm test`, `npm run test:e2e`, and `npm run build`.
+
+The runtime evaluator checks the rendered dialog contract; Playwright independently verifies that same contract in a browser. `MockRepairProvider` is a labelled deterministic demo flow and `DeterministicCoachProvider` is an explicit Demo Coach fallback. No arbitrary code execution, client secrets, raw authentication data, or production sandbox are provided. A future local Codex SDK coach must remain server-only, feature-flagged, allowlisted, read-only, and validated.
+
+## Built with Codex and GPT-5.6
+
+Codex was used for accessibility analysis, architecture, implementation, test design, debugging, and documentation in this build thread. Runtime repair is deterministic and separate from optional local AI coaching; GPT-5.6 does not run in the deployed application. Important decisions remain with the human developer.
 
 ## Getting Started
 

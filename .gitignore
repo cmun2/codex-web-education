@@ -12,6 +12,13 @@
 
 # testing
 /coverage
+/playwright-report/
+/test-results/
+
+# local runtime workspaces and browser data
+.codex-output/
+.runtime-workspaces/
+browser-profiles/
 
 # next.js
 /.next/

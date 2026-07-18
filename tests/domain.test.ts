@@ -1,0 +1,6 @@
+import { describe, expect, it } from "vitest";
+import { battleReducer, initialBattleState } from "@/lib/domain/battle";
+import { bossHealth, missionComplete, ObjectiveResult } from "@/lib/domain/mission";
+import { DeterministicCoachProvider, MockRepairProvider } from "@/lib/domain/providers";
+const pass: ObjectiveResult[] = ["identity","focus","keyboard"].map((objectiveId) => ({ objectiveId: objectiveId as ObjectiveResult["objectiveId"], status:"passed", checks:["ok"], failureCodes:[] }));
+describe("battle domain",()=>{it("calculates damage from passed objectives",()=>expect(bossHealth(pass)).toBe(0));it("aggregates mission completion",()=>expect(missionComplete(pass)).toBe(true));it("reaches victory and resets",()=>{const won=battleReducer(initialBattleState,{type:"RESULTS",results:pass});expect(won.phase).toBe("victory");expect(battleReducer(won,{type:"RESET"}).hp).toBe(100)});it("reports mock repair progress",async()=>{const feed:string[]=[];await new MockRepairProvider().repair(x=>feed.push(x.message));expect(feed).toHaveLength(2)});it("uses truthful demo coach fallback",async()=>expect((await new DeterministicCoachProvider().coach({objectiveStatuses:[],attempt:0})).source).toBe("Demo Coach"));it("keeps failures from winning",()=>{const failed=[{...pass[0],status:"failed" as const}];expect(missionComplete(failed)).toBe(false)})});

@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Debugging Arena — Working Title",
-  description: "An accessible frontend debugging game.",
+  title: "Frontend Debugging Arena — Working Title",
+  description: "Fix real frontend bugs and defeat the boss by passing browser checks.",
 };
 
 export default function RootLayout({

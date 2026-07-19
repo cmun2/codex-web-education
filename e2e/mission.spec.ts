@@ -103,6 +103,30 @@ test("reset code restores the constrained broken implementation without erasing 
   await expect(page.getByRole("button", { name: /Attempt 1/ })).toBeVisible();
 });
 
+test("reveals one requested visual coach hint for the selected failed snapshot", async ({ page }) => {
+  await enterEnglishMission(page);
+  await expect(page.getByText("Visual observation", { exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Ask Visual Coach" })).toBeDisabled();
+
+  await page.getByRole("button", { name: "Run Checks" }).click();
+  await expect(page.getByRole("button", { name: "Attempt 1 · 0/3" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByText("Visual observation", { exact: true })).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Ask Visual Coach" }).click();
+  await expect(page.getByText("Demo Coach", { exact: true })).toBeVisible();
+  await expect(page.getByText("Progressive hint 1 of 3", { exact: true })).toBeVisible();
+  await expect(page.getByText("Visual observation", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Hint revealed for this attempt" })).toBeDisabled();
+
+  await page.getByRole("button", { name: "Return to Code Lab" }).click();
+  await expect(page.getByRole("heading", { name: "Code Lab" })).toBeFocused();
+
+  await page.getByRole("button", { name: "Run Checks" }).click();
+  await expect(page.getByRole("button", { name: "Attempt 2 · 0/3" })).toHaveAttribute("aria-pressed", "true");
+  await page.getByRole("button", { name: "Ask Visual Coach" }).click();
+  await expect(page.getByText("Progressive hint 2 of 3", { exact: true })).toBeVisible();
+});
+
 test("switches to Korean, persists the choice, and exposes localized Code Lab actions on mobile", async ({ page }) => {
   const browserErrors = captureBrowserErrors(page);
   await page.setViewportSize({ width: 390, height: 844 });

@@ -57,7 +57,15 @@ Mission fixtures are isolated from product coordination. Repair, objective evalu
 
 ## Deployment
 
-The deterministic experience can run on a free Vercel deployment using the normal Next.js build with no environment variables. The optional Ollama provider is intended for local/server-local use: a hosted Vercel function cannot reach Ollama on a developer laptop through its own loopback address, so hosted demos should use the deterministic default unless they have a separately reviewed private deployment design.
+The deterministic experience can run on Vercel's free Hobby plan. A human release owner can deploy a reviewed branch with these steps:
+
+1. From a clean checkout of the review branch, confirm `node --version` reports Node 22, run `npm ci`, then run `npm run lint`, `npm run typecheck`, `npm test`, `npm run test:e2e`, and `npm run build`. Confirm `git status --short` contains no unexpected files.
+2. Push the reviewed branch with `git push --set-upstream origin HEAD` and complete any required repository review before deployment.
+3. In the Vercel dashboard, choose **Add New → Project**, import this Git repository, and select the reviewed branch for the deployment. Keep the detected **Next.js** framework preset, repository root (`.`), and default install, build, and output settings.
+4. Add no environment variables for the deterministic demo. In particular, leave `AI_COACH_PROVIDER` unset so the runtime uses its `demo` default; do not configure the local Ollama variables for a hosted demo.
+5. After Vercel reports a successful deployment, open the generated URL in a signed-out or private browser window. Verify the English and Korean mission journeys, deterministic Demo Coach and fallback behavior, replay, narrow layout, keyboard flow, and browser console before publishing that URL.
+
+The optional Ollama provider is intended for local/server-local use: a hosted Vercel function cannot reach Ollama on a developer laptop through its own loopback address. These are human-run release instructions only; this repository does not claim an unverified deployment URL.
 
 ## Development-time AI contribution
 

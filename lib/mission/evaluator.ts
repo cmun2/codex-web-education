@@ -1,48 +1,95 @@
 import type { ObjectiveEvaluator } from "@/lib/domain/providers";
-import type { FailureCode, MissionAttempt, MissionObjectiveId, ObjectiveResult, VerificationResult } from "@/lib/domain/mission";
+import type {
+  CheckCode,
+  FailureCode,
+  MissionObjectiveId,
+  ObjectiveResult,
+} from "@/lib/domain/mission";
 
-const resultFor = (objectiveId: MissionObjectiveId, passed: boolean, failureCode: FailureCode): ObjectiveResult => ({
+const resultFor = (
+  objectiveId: MissionObjectiveId,
+  passed: boolean,
+  checkCode: CheckCode,
+  failureCode: FailureCode,
+): ObjectiveResult => ({
   objectiveId,
   status: passed ? "passed" : "failed",
-  checks: passed ? [objectiveId] : [],
+  checks: passed ? [checkCode] : [],
   failureCodes: passed ? [] : [failureCode],
 });
 
-export class DialogObjectiveEvaluator implements ObjectiveEvaluator {
-  evaluate(root: HTMLElement, attempt: MissionAttempt): VerificationResult {
-    const dialog = root.querySelector<HTMLElement>("[data-testid='mission-dialog']");
-    const labelledBy = dialog?.getAttribute("aria-labelledby");
-    const describedBy = dialog?.getAttribute("aria-describedby");
-    const hasReferencedText = (id: string | null | undefined): boolean => {
-      if (!id) return false;
-      const referencedElement = root.ownerDocument.getElementById(id);
-      return Boolean(referencedElement && root.contains(referencedElement) && referencedElement.textContent?.trim());
-    };
+const afterRender = (): Promise<void> =>
+  new Promise((resolve) => {
+    if (typeof requestAnimationFrame === "function") {
+      requestAnimationFrame(() => resolve());
+    } else {
+      queueMicrotask(resolve);
+    }
+  });
 
+const currentDialog = (root: HTMLElement): HTMLElement | null =>
+  root.querySelector<HTMLElement>("[data-testid='mission-dialog']");
+
+const openDialog = async (root: HTMLElement): Promise<HTMLElement | null> => {
+  const existing = currentDialog(root);
+  if (existing) return existing;
+  root.querySelector<HTMLButtonElement>("[data-action='trigger']")?.click();
+  await afterRender();
+  return currentDialog(root);
+};
+
+const openFreshDialog = async (root: HTMLElement): Promise<HTMLElement | null> => {
+  const existing = currentDialog(root);
+  existing?.querySelector<HTMLButtonElement>("[data-action='close']")?.click();
+  if (existing) await afterRender();
+  return openDialog(root);
+};
+
+const hasReferencedText = (root: HTMLElement, id: string | null): boolean => {
+  if (!id) return false;
+  const referencedElement = root.ownerDocument.getElementById(id);
+  return Boolean(referencedElement && root.contains(referencedElement) && referencedElement.textContent?.trim());
+};
+
+const dispatchKey = (target: HTMLElement, key: string, shiftKey = false): void => {
+  target.dispatchEvent(new KeyboardEvent("keydown", { key, shiftKey, bubbles: true, cancelable: true }));
+};
+
+export class DialogObjectiveEvaluator implements ObjectiveEvaluator {
+  async evaluate(root: HTMLElement): Promise<ObjectiveResult[]> {
+    const dialog = await openFreshDialog(root);
+    const labelledBy = dialog?.getAttribute("aria-labelledby") ?? null;
+    const describedBy = dialog?.getAttribute("aria-describedby") ?? null;
     const identity = Boolean(
       dialog?.getAttribute("role") === "dialog" &&
         dialog.getAttribute("aria-modal") === "true" &&
-        hasReferencedText(labelledBy) &&
-        hasReferencedText(describedBy),
-    );
-    const focus = Boolean(dialog?.contains(document.activeElement) && dialog.dataset.initialFocus === "true" && dialog.dataset.focusLoop === "true");
-    const keyboard = Boolean(
-      dialog?.querySelector("[data-action='close']") &&
-        dialog.querySelector("[data-action='primary']") &&
-        dialog.dataset.keyboardContract === "true" &&
-        dialog.dataset.focusReturn === "true",
+        hasReferencedText(root, labelledBy) &&
+        hasReferencedText(root, describedBy),
     );
 
-    const objectives = [
-      resultFor("identity", identity, "DIALOG_IDENTITY_MISSING"),
-      resultFor("focus", focus, "FOCUS_CONTAINMENT_MISSING"),
-      resultFor("keyboard", keyboard, "KEYBOARD_ACTIONS_MISSING"),
+    const closeButton = dialog?.querySelector<HTMLButtonElement>("[data-action='close']") ?? null;
+    const primaryButton = dialog?.querySelector<HTMLButtonElement>("[data-action='primary']") ?? null;
+    const initialFocusInside = Boolean(dialog?.contains(root.ownerDocument.activeElement));
+
+    primaryButton?.focus();
+    if (dialog) dispatchKey(dialog, "Tab");
+    const forwardLooped = root.ownerDocument.activeElement === closeButton;
+    closeButton?.focus();
+    if (dialog) dispatchKey(dialog, "Tab", true);
+    const backwardLooped = root.ownerDocument.activeElement === primaryButton;
+    const focus = initialFocusInside && forwardLooped && backwardLooped;
+
+    if (dialog) dispatchKey(dialog, "Escape");
+    await afterRender();
+    const trigger = root.querySelector<HTMLButtonElement>("[data-action='trigger']");
+    const keyboard = currentDialog(root) === null && root.ownerDocument.activeElement === trigger;
+
+    await openDialog(root);
+
+    return [
+      resultFor("identity", identity, "DIALOG_SEMANTICS_VERIFIED", "DIALOG_IDENTITY_MISSING"),
+      resultFor("focus", focus, "FOCUS_LOOP_VERIFIED", "FOCUS_CONTAINMENT_MISSING"),
+      resultFor("keyboard", keyboard, "ESCAPE_AND_RETURN_VERIFIED", "KEYBOARD_ACTIONS_MISSING"),
     ];
-
-    return {
-      attempt,
-      objectives,
-      evidence: objectives.map((objective) => ({ objectiveId: objective.objectiveId, contract: "rendered-dom", passed: objective.status === "passed" })),
-    };
   }
 }

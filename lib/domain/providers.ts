@@ -1,13 +1,7 @@
-import type { MissionAttempt, ObjectiveStatus, VerificationResult } from "@/lib/domain/mission";
-
-export type RepairProgressEvent = { code: "repair-started" | "repair-applied" };
-
-export interface CodeLab {
-  applyGuidedRepair(onProgress: (event: RepairProgressEvent) => void): Promise<void>;
-}
+import type { ObjectiveResult, ObjectiveStatus } from "@/lib/domain/mission";
 
 export interface ObjectiveEvaluator {
-  evaluate(root: HTMLElement, attempt: MissionAttempt): VerificationResult;
+  evaluate(root: HTMLElement): Promise<ObjectiveResult[]>;
 }
 
 export type CoachInsight = {
@@ -17,14 +11,6 @@ export type CoachInsight = {
 
 export interface CoachProvider {
   coach(input: { objectiveStatuses: readonly ObjectiveStatus[]; attempt: number }): Promise<CoachInsight>;
-}
-
-export class DeterministicCodeLab implements CodeLab {
-  async applyGuidedRepair(onProgress: (event: RepairProgressEvent) => void): Promise<void> {
-    onProgress({ code: "repair-started" });
-    await Promise.resolve();
-    onProgress({ code: "repair-applied" });
-  }
 }
 
 export class DeterministicCoachProvider implements CoachProvider {

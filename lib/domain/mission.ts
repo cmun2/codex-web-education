@@ -1,35 +1,62 @@
 export type MissionObjectiveId = "identity" | "focus" | "keyboard";
 export type ObjectiveStatus = "pending" | "passed" | "failed";
 
+export type DialogRole = "none" | "dialog";
+export type DialogReference = "none" | "dialog-title" | "dialog-description";
+
+export type DialogCodeState = {
+  dialogRole: DialogRole;
+  ariaModal: boolean;
+  ariaLabelledBy: Extract<DialogReference, "none" | "dialog-title">;
+  ariaDescribedBy: Extract<DialogReference, "none" | "dialog-description">;
+  escapeCloses: boolean;
+  focusContainment: boolean;
+  focusRestoration: boolean;
+};
+
 export type MissionObjective = {
   id: MissionObjectiveId;
   damage: number;
 };
 
+export type CheckCode =
+  | "DIALOG_SEMANTICS_VERIFIED"
+  | "FOCUS_LOOP_VERIFIED"
+  | "ESCAPE_AND_RETURN_VERIFIED";
+
 export type ObjectiveResult = {
   objectiveId: MissionObjectiveId;
   status: Exclude<ObjectiveStatus, "pending">;
-  checks: string[];
+  checks: CheckCode[];
   failureCodes: FailureCode[];
 };
 
-export type FailureCode = "DIALOG_IDENTITY_MISSING" | "FOCUS_CONTAINMENT_MISSING" | "KEYBOARD_ACTIONS_MISSING";
+export type FailureCode =
+  | "DIALOG_IDENTITY_MISSING"
+  | "FOCUS_CONTAINMENT_MISSING"
+  | "KEYBOARD_ACTIONS_MISSING";
 
 export type SnapshotEvidence = {
-  objectiveId: MissionObjectiveId;
-  contract: "rendered-dom";
-  passed: boolean;
+  contract: "fixture-region-v1";
+  attemptNumber: number;
+  locale: "ko" | "en";
+  capturedAt: string;
+  regionTestId: "mission-fixture";
+  dimensions: { width: number; height: number };
+  codeState: DialogCodeState;
+  objectiveResults: ObjectiveResult[];
+  imageDataUrl: string;
 };
 
 export type MissionAttempt = {
   number: number;
-  repairApplied: boolean;
+  codeState: DialogCodeState;
 };
 
 export type VerificationResult = {
   attempt: MissionAttempt;
   objectives: ObjectiveResult[];
-  evidence: SnapshotEvidence[];
+  snapshot: SnapshotEvidence;
 };
 
 export const keyboardTrapObjectives: readonly MissionObjective[] = [
@@ -38,11 +65,18 @@ export const keyboardTrapObjectives: readonly MissionObjective[] = [
   { id: "keyboard", damage: 35 },
 ];
 
+export const damageForObjectives = (objectiveIds: readonly MissionObjectiveId[]): number =>
+  keyboardTrapObjectives
+    .filter((objective) => objectiveIds.includes(objective.id))
+    .reduce((sum, objective) => sum + objective.damage, 0);
+
+export const bossHealthForVerifiedObjectives = (objectiveIds: readonly MissionObjectiveId[]): number =>
+  Math.max(0, 100 - damageForObjectives(objectiveIds));
+
 export const bossHealth = (results: readonly ObjectiveResult[]): number =>
-  Math.max(
-    0,
-    100 - results.filter((result) => result.status === "passed").reduce((sum, result) => sum + (keyboardTrapObjectives.find((objective) => objective.id === result.objectiveId)?.damage ?? 0), 0),
+  bossHealthForVerifiedObjectives(
+    results.filter((result) => result.status === "passed").map((result) => result.objectiveId),
   );
 
-export const missionComplete = (results: readonly ObjectiveResult[]): boolean =>
-  keyboardTrapObjectives.every((objective) => results.some((result) => result.objectiveId === objective.id && result.status === "passed"));
+export const missionComplete = (objectiveIds: readonly MissionObjectiveId[]): boolean =>
+  keyboardTrapObjectives.every((objective) => objectiveIds.includes(objective.id));

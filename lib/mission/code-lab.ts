@@ -1,0 +1,164 @@
+import type { DialogCodeState } from "@/lib/domain/mission";
+
+export const brokenDialogCode: DialogCodeState = {
+  dialogRole: "none",
+  ariaModal: false,
+  ariaLabelledBy: "none",
+  ariaDescribedBy: "none",
+  escapeCloses: false,
+  focusContainment: false,
+  focusRestoration: false,
+};
+
+export const repairedDialogCode: DialogCodeState = {
+  dialogRole: "dialog",
+  ariaModal: true,
+  ariaLabelledBy: "dialog-title",
+  ariaDescribedBy: "dialog-description",
+  escapeCloses: true,
+  focusContainment: true,
+  focusRestoration: true,
+};
+
+const fieldNames = [
+  "dialogRole",
+  "ariaModal",
+  "ariaLabelledBy",
+  "ariaDescribedBy",
+  "escapeCloses",
+  "focusContainment",
+  "focusRestoration",
+] as const;
+
+export type CodeLabValidationError =
+  | "NOT_AN_OBJECT"
+  | "UNSUPPORTED_FIELD"
+  | "INVALID_DIALOG_ROLE"
+  | "INVALID_ARIA_MODAL"
+  | "INVALID_LABEL_REFERENCE"
+  | "INVALID_DESCRIPTION_REFERENCE"
+  | "INVALID_ESCAPE_BEHAVIOR"
+  | "INVALID_FOCUS_CONTAINMENT"
+  | "INVALID_FOCUS_RESTORATION";
+
+export type CodeLabValidation =
+  | { ok: true; value: DialogCodeState }
+  | { ok: false; errors: CodeLabValidationError[] };
+
+const read = (input: object, key: string): unknown => Object.getOwnPropertyDescriptor(input, key)?.value;
+
+export function validateDialogCodeState(input: unknown): CodeLabValidation {
+  if (typeof input !== "object" || input === null || Array.isArray(input)) {
+    return { ok: false, errors: ["NOT_AN_OBJECT"] };
+  }
+
+  const errors: CodeLabValidationError[] = [];
+  if (Object.keys(input).some((key) => !fieldNames.some((fieldName) => fieldName === key))) errors.push("UNSUPPORTED_FIELD");
+
+  const dialogRole = read(input, "dialogRole");
+  const ariaModal = read(input, "ariaModal");
+  const ariaLabelledBy = read(input, "ariaLabelledBy");
+  const ariaDescribedBy = read(input, "ariaDescribedBy");
+  const escapeCloses = read(input, "escapeCloses");
+  const focusContainment = read(input, "focusContainment");
+  const focusRestoration = read(input, "focusRestoration");
+
+  if (dialogRole !== "none" && dialogRole !== "dialog") errors.push("INVALID_DIALOG_ROLE");
+  if (typeof ariaModal !== "boolean") errors.push("INVALID_ARIA_MODAL");
+  if (ariaLabelledBy !== "none" && ariaLabelledBy !== "dialog-title") errors.push("INVALID_LABEL_REFERENCE");
+  if (ariaDescribedBy !== "none" && ariaDescribedBy !== "dialog-description") errors.push("INVALID_DESCRIPTION_REFERENCE");
+  if (typeof escapeCloses !== "boolean") errors.push("INVALID_ESCAPE_BEHAVIOR");
+  if (typeof focusContainment !== "boolean") errors.push("INVALID_FOCUS_CONTAINMENT");
+  if (typeof focusRestoration !== "boolean") errors.push("INVALID_FOCUS_RESTORATION");
+
+  if (errors.length > 0) return { ok: false, errors };
+  if (
+    (dialogRole !== "none" && dialogRole !== "dialog") ||
+    typeof ariaModal !== "boolean" ||
+    (ariaLabelledBy !== "none" && ariaLabelledBy !== "dialog-title") ||
+    (ariaDescribedBy !== "none" && ariaDescribedBy !== "dialog-description") ||
+    typeof escapeCloses !== "boolean" ||
+    typeof focusContainment !== "boolean" ||
+    typeof focusRestoration !== "boolean"
+  ) {
+    return { ok: false, errors: ["NOT_AN_OBJECT"] };
+  }
+
+  return {
+    ok: true,
+    value: {
+      dialogRole,
+      ariaModal,
+      ariaLabelledBy,
+      ariaDescribedBy,
+      escapeCloses,
+      focusContainment,
+      focusRestoration,
+    },
+  };
+}
+
+export type CodeDiffLine = { kind: "same" | "added" | "removed"; text: string };
+
+const sourceLines = (state: DialogCodeState): string[] => [
+  "function SafeguardDialog() {",
+  `  const escapeCloses = ${String(state.escapeCloses)};`,
+  `  const containFocus = ${String(state.focusContainment)};`,
+  `  const restoreFocus = ${String(state.focusRestoration)};`,
+  "  return (",
+  `    <div role=${state.dialogRole === "none" ? "{undefined}" : '"dialog"'}`,
+  `      aria-modal={${String(state.ariaModal)}}`,
+  `      aria-labelledby=${state.ariaLabelledBy === "none" ? "{undefined}" : '"dialog-title"'}`,
+  `      aria-describedby=${state.ariaDescribedBy === "none" ? "{undefined}" : '"dialog-description"'}>`,
+  "      <DialogActions />",
+  "    </div>",
+  "  );",
+  "}",
+];
+
+export const renderDialogCode = (state: DialogCodeState): string => sourceLines(state).join("\n");
+
+export function diffDialogCode(before: DialogCodeState, after: DialogCodeState): CodeDiffLine[] {
+  const beforeLines = sourceLines(before);
+  const afterLines = sourceLines(after);
+  const diff: CodeDiffLine[] = [];
+  for (let index = 0; index < beforeLines.length; index += 1) {
+    const previous = beforeLines[index];
+    const next = afterLines[index];
+    if (previous === next) {
+      diff.push({ kind: "same", text: previous });
+    } else {
+      diff.push({ kind: "removed", text: previous });
+      diff.push({ kind: "added", text: next });
+    }
+  }
+  return diff;
+}
+
+export const isFullyRepaired = (state: DialogCodeState): boolean =>
+  fieldNames.every((fieldName) => state[fieldName] === repairedDialogCode[fieldName]);
+
+export interface CodeLab {
+  apply(input: unknown): CodeLabValidation;
+  reset(): DialogCodeState;
+  diff(state: DialogCodeState): CodeDiffLine[];
+  source(state: DialogCodeState): string;
+}
+
+export class AllowlistedDialogCodeLab implements CodeLab {
+  apply(input: unknown): CodeLabValidation {
+    return validateDialogCodeState(input);
+  }
+
+  reset(): DialogCodeState {
+    return { ...brokenDialogCode };
+  }
+
+  diff(state: DialogCodeState): CodeDiffLine[] {
+    return diffDialogCode(brokenDialogCode, state);
+  }
+
+  source(state: DialogCodeState): string {
+    return renderDialogCode(state);
+  }
+}

@@ -38,7 +38,10 @@ This checklist separates repository-verifiable facts from human submission tasks
 
 - [ ] Choose the final project name and replace the descriptive working title if desired.
 - [ ] Create a public YouTube demo under three minutes with audible narration.
-- [ ] Manually use `/feedback` in the primary Build Week thread, then record the resulting Thread ID, worktree name (`release-integration`), branch (`feat/release-integration`), and a concise contribution summary in the human handoff.
+- [ ] Run `/feedback` manually—never automatically—and preserve the feedback handoff:
+  - Record each returned Thread ID with its worktree name, branch, and contribution summary.
+  - Collect the parent coordinator thread (`build-week-orchestrator` on `feat/build-week-orchestrator`), the core implementation thread (`interactive-debug-lab` on `feat/interactive-debug-lab`), `visual-ai-coach` on `feat/visual-ai-coach` when its contribution is substantial, and any other major implementation worker.
+  - Review the collected threads and choose the most representative core implementation thread for submission; do not assume the newest Thread ID is automatically the best choice.
 - [ ] Rewrite factual source material in the human submitter's own voice; do not paste generated final submission prose.
 - [ ] Add the final deployment URL and verify it from a signed-out browser.
 - [ ] Share private repository access with the event-provided reviewer accounts if required.

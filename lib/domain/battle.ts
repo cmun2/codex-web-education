@@ -1,19 +1,66 @@
-import { bossHealth, missionComplete, ObjectiveResult } from "@/lib/domain/mission";
+import { bossHealth, missionComplete, type ObjectiveResult, type VerificationResult } from "@/lib/domain/mission";
 
-export type BattlePhase = "idle" | "inspecting" | "repairing" | "evaluating" | "damaged" | "victory";
-export type BattleState = { phase: BattlePhase; results: ObjectiveResult[]; hp: number; repaired: boolean; attempt: number; feed: string[] };
+export type MissionPhase = "landing" | "briefing" | "broken-preview" | "attempting" | "verifying" | "partial-success" | "failure" | "victory" | "debrief";
+export type FixtureStatus = "broken" | "repaired";
+export type FeedCode = "entered-preview" | "repair-started" | "repair-applied" | "verification-started" | "verification-failed" | "verification-partial" | "verification-passed";
+
+export type BattleState = {
+  phase: MissionPhase;
+  results: ObjectiveResult[];
+  hp: number;
+  fixture: FixtureStatus;
+  attempt: number;
+  feed: FeedCode[];
+};
+
 export type BattleAction =
-  | { type: "START" }
-  | { type: "REPAIRED" }
-  | { type: "RESULTS"; results: ObjectiveResult[] }
-  | { type: "RESET" };
+  | { type: "START_MISSION" }
+  | { type: "ENTER_PREVIEW" }
+  | { type: "BEGIN_REPAIR" }
+  | { type: "REPAIR_APPLIED" }
+  | { type: "BEGIN_VERIFICATION" }
+  | { type: "RESULTS"; result: VerificationResult }
+  | { type: "RESET_ATTEMPT" }
+  | { type: "SHOW_DEBRIEF" }
+  | { type: "REPLAY" };
 
-export const initialBattleState: BattleState = { phase: "idle", results: [], hp: 100, repaired: false, attempt: 0, feed: ["Broken fixture loaded. Browser objectives are waiting."] };
+export const initialBattleState: BattleState = {
+  phase: "landing",
+  results: [],
+  hp: 100,
+  fixture: "broken",
+  attempt: 1,
+  feed: [],
+};
+
+const verificationPhase = (results: readonly ObjectiveResult[]): "partial-success" | "failure" | "victory" => {
+  if (missionComplete(results)) return "victory";
+  return results.some((result) => result.status === "passed") ? "partial-success" : "failure";
+};
 
 export function battleReducer(state: BattleState, action: BattleAction): BattleState {
-  if (action.type === "RESET") return { ...initialBattleState, attempt: state.attempt + 1 };
-  if (action.type === "START") return { ...state, phase: "inspecting", feed: [...state.feed, "Inspecting dialog semantics and keyboard paths…", "Applying deterministic demo repair…"] };
-  if (action.type === "REPAIRED") return { ...state, phase: "evaluating", repaired: true, feed: [...state.feed, "Repaired fixture mounted. Verifying user behavior…"] };
-  const hp = bossHealth(action.results);
-  return { ...state, results: action.results, hp, phase: missionComplete(action.results) ? "victory" : "damaged", feed: [...state.feed, ...action.results.map((result) => `${result.objectiveId}: ${result.status}`), missionComplete(action.results) ? "Acceptance checks complete. Keyboard Trap Boss defeated." : "Some browser objectives still fail."] };
+  switch (action.type) {
+    case "START_MISSION":
+      return { ...state, phase: "briefing" };
+    case "ENTER_PREVIEW":
+      return { ...state, phase: "broken-preview", feed: ["entered-preview"] };
+    case "BEGIN_REPAIR":
+      return { ...state, phase: "attempting", feed: [...state.feed, "repair-started"] };
+    case "REPAIR_APPLIED":
+      return { ...state, fixture: "repaired", feed: [...state.feed, "repair-applied"] };
+    case "BEGIN_VERIFICATION":
+      return { ...state, phase: "verifying", feed: [...state.feed, "verification-started"] };
+    case "RESULTS": {
+      const results = action.result.objectives;
+      const phase = verificationPhase(results);
+      const outcome: FeedCode = phase === "victory" ? "verification-passed" : phase === "partial-success" ? "verification-partial" : "verification-failed";
+      return { ...state, results, hp: bossHealth(results), phase, feed: [...state.feed, outcome] };
+    }
+    case "RESET_ATTEMPT":
+      return { ...initialBattleState, phase: "broken-preview", attempt: state.attempt + 1, feed: ["entered-preview"] };
+    case "SHOW_DEBRIEF":
+      return state.phase === "victory" ? { ...state, phase: "debrief" } : state;
+    case "REPLAY":
+      return initialBattleState;
+  }
 }

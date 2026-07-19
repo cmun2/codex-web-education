@@ -1,6 +1,8 @@
 import {
   bossHealthForVerifiedObjectives,
+  damageForObjectives,
   missionComplete,
+  xpForObjectives,
   type MissionObjectiveId,
   type ObjectiveResult,
   type VerificationResult,
@@ -17,6 +19,15 @@ export type MissionPhase =
   | "victory"
   | "debrief";
 export type FixtureStatus = "broken" | "modified" | "repaired";
+export type MissionRank = "S" | "A" | "B" | "C";
+export type BattleHit = {
+  attempt: number;
+  objectiveIds: MissionObjectiveId[];
+  damage: number;
+  xp: number;
+  combo: number;
+  accessibilityCriticalHit: true;
+};
 export type FeedCode =
   | "entered-preview"
   | "changes-applied"
@@ -35,6 +46,11 @@ export type BattleState = {
   attempt: number;
   history: VerificationResult[];
   feed: FeedCode[];
+  xpEarned: number;
+  combo: number;
+  lastHit: BattleHit | null;
+  rank: MissionRank | null;
+  perfectRepair: boolean;
 };
 
 export type BattleAction =
@@ -56,6 +72,11 @@ export const initialBattleState: BattleState = {
   attempt: 1,
   history: [],
   feed: [],
+  xpEarned: 0,
+  combo: 0,
+  lastHit: null,
+  rank: null,
+  perfectRepair: false,
 };
 
 const addNewlyPassed = (
@@ -69,6 +90,20 @@ const addNewlyPassed = (
   return updated;
 };
 
+const newlyPassed = (
+  verified: readonly MissionObjectiveId[],
+  results: readonly ObjectiveResult[],
+): MissionObjectiveId[] => results
+  .filter((result) => result.status === "passed" && !verified.includes(result.objectiveId))
+  .map((result) => result.objectiveId);
+
+export const rankForAttempts = (attempts: number): MissionRank => {
+  if (attempts <= 1) return "S";
+  if (attempts === 2) return "A";
+  if (attempts === 3) return "B";
+  return "C";
+};
+
 export function battleReducer(state: BattleState, action: BattleAction): BattleState {
   switch (action.type) {
     case "START_MISSION":
@@ -76,12 +111,13 @@ export function battleReducer(state: BattleState, action: BattleAction): BattleS
     case "ENTER_PREVIEW":
       return { ...state, phase: "broken-preview", feed: ["entered-preview"] };
     case "CHANGES_APPLIED":
-      return { ...state, phase: "attempting", fixture: action.fixture, feed: [...state.feed, "changes-applied"] };
+      return { ...state, phase: "attempting", fixture: action.fixture, lastHit: null, feed: [...state.feed, "changes-applied"] };
     case "CODE_RESET":
       return { ...state, phase: "broken-preview", fixture: "broken", feed: [...state.feed, "code-reset"] };
     case "BEGIN_VERIFICATION":
-      return { ...state, phase: "verifying", feed: [...state.feed, "verification-started"] };
+      return { ...state, phase: "verifying", lastHit: null, feed: [...state.feed, "verification-started"] };
     case "RESULTS": {
+      const newlyPassedObjectiveIds = newlyPassed(state.verifiedObjectiveIds, action.result.objectives);
       const verifiedObjectiveIds = addNewlyPassed(state.verifiedObjectiveIds, action.result.objectives);
       const won = missionComplete(verifiedObjectiveIds);
       const anyPassed = verifiedObjectiveIds.length > 0;
@@ -91,6 +127,10 @@ export function battleReducer(state: BattleState, action: BattleAction): BattleS
         : anyPassed
           ? "verification-partial"
           : "verification-failed";
+      const damage = damageForObjectives(newlyPassedObjectiveIds);
+      const xp = xpForObjectives(newlyPassedObjectiveIds);
+      const combo = newlyPassedObjectiveIds.length > 0 ? state.combo + newlyPassedObjectiveIds.length : 0;
+      const attempts = state.history.length + 1;
       return {
         ...state,
         results: action.result.objectives,
@@ -100,6 +140,20 @@ export function battleReducer(state: BattleState, action: BattleAction): BattleS
         attempt: state.attempt + 1,
         history: [...state.history, action.result],
         feed: [...state.feed, outcome],
+        xpEarned: state.xpEarned + xp,
+        combo,
+        lastHit: newlyPassedObjectiveIds.length > 0
+          ? {
+              attempt: action.result.attempt.number,
+              objectiveIds: newlyPassedObjectiveIds,
+              damage,
+              xp,
+              combo,
+              accessibilityCriticalHit: true,
+            }
+          : null,
+        rank: won ? rankForAttempts(attempts) : null,
+        perfectRepair: won && attempts === 1,
       };
     }
     case "SHOW_DEBRIEF":

@@ -1,4 +1,5 @@
 import type { CheckCode, FailureCode, MissionObjectiveId, ObjectiveStatus } from "@/lib/domain/mission";
+import type { MissionRank } from "@/lib/domain/battle";
 import type { CodeLabValidationError } from "@/lib/mission/code-lab";
 
 export const supportedLocales = ["ko", "en"] as const;
@@ -38,6 +39,30 @@ type Dictionary = {
     phase: Record<"broken-preview" | "attempting" | "verifying" | "partial-success" | "failure" | "victory", string>;
   };
   actions: { askCoach: string; seeDebrief: string; replay: string };
+  progression: {
+    attempts: (attempts: number) => string;
+    combo: (combo: number) => string;
+    xp: (xp: number) => string;
+    xpGain: (xp: number) => string;
+    xpEarned: (xp: number) => string;
+    totalXp: (xp: number) => string;
+    rank: (rank: MissionRank) => string;
+    victory: string;
+    bossDefeated: string;
+    criticalHit: string;
+    perfectRepair: string;
+    restoredHeading: string;
+    hitAnnouncement: (damage: number, xp: number, combo: number) => string;
+    storageFallback: string;
+    soundOn: string;
+    soundMuted: string;
+    mute: string;
+    unmute: string;
+    teaserLabel: string;
+    teaserTitle: string;
+    teaserBody: string;
+    unavailable: string;
+  };
   codeLab: {
     eyebrow: string;
     heading: string;
@@ -137,6 +162,30 @@ export const dictionaries = {
       phase: { "broken-preview": "고장 난 동작을 조사하는 중", attempting: "코드 변경 사항을 적용함", verifying: "브라우저 검사를 실행하는 중", "partial-success": "일부 검사 통과 — 수리가 더 필요함", failure: "검사 실패 — 고장 난 동작을 다시 살펴보세요", victory: "승리 — 모든 브라우저 검사 통과" },
     },
     actions: { askCoach: "디버그 코치에게 묻기", seeDebrief: "학습 정리 보기", replay: "미션 다시 플레이" },
+    progression: {
+      attempts: (attempts) => `시도 ${attempts}회`,
+      combo: (combo) => `연속 통과 콤보 ×${combo}`,
+      xp: (xp) => `미션 XP ${xp}`,
+      xpGain: (xp) => `+${xp} XP`,
+      xpEarned: (xp) => `획득 XP ${xp}`,
+      totalXp: (xp) => `총 XP ${xp}`,
+      rank: (rank) => `미션 랭크 ${rank}`,
+      victory: "승리",
+      bossDefeated: "보스 격파",
+      criticalHit: "접근성 크리티컬 히트",
+      perfectRepair: "완벽한 수리",
+      restoredHeading: "복구한 사용자 동작",
+      hitAnnouncement: (damage, xp, combo) => `검증된 새 목표로 보스에게 ${damage} 피해, ${xp} XP를 획득했습니다. 연속 통과 콤보 ${combo}. 접근성 크리티컬 히트.`,
+      storageFallback: "브라우저 저장소를 사용할 수 없어 이 세션에서만 진행 상황을 유지합니다. 미션은 계속 플레이할 수 있습니다.",
+      soundOn: "전투 소리 켜짐. 음소거하기",
+      soundMuted: "전투 소리 꺼짐. 소리 켜기",
+      mute: "음소거",
+      unmute: "소리 켜기",
+      teaserLabel: "다음 미션 미리보기",
+      teaserTitle: "레이블 미궁",
+      teaserBody: "폼 오류와 접근 가능한 이름을 복구하는 다음 미션이 준비 중입니다.",
+      unavailable: "현재 이용할 수 없음",
+    },
     codeLab: {
       eyebrow: "안전한 코드 실습",
       heading: "Code Lab",
@@ -244,6 +293,30 @@ export const dictionaries = {
       phase: { "broken-preview": "Inspecting the broken behavior", attempting: "Code changes applied", verifying: "Running browser checks", "partial-success": "Some checks passed — more repair needed", failure: "Checks failed — inspect the broken behavior again", victory: "Victory — all browser checks passed" },
     },
     actions: { askCoach: "Ask Debug Coach", seeDebrief: "View learning debrief", replay: "Replay mission" },
+    progression: {
+      attempts: (attempts) => `Attempts ${attempts}`,
+      combo: (combo) => `Consecutive-pass combo ×${combo}`,
+      xp: (xp) => `Mission XP ${xp}`,
+      xpGain: (xp) => `+${xp} XP`,
+      xpEarned: (xp) => `XP earned ${xp}`,
+      totalXp: (xp) => `Total XP ${xp}`,
+      rank: (rank) => `Mission rank ${rank}`,
+      victory: "Victory",
+      bossDefeated: "Boss Defeated",
+      criticalHit: "Accessibility Critical Hit",
+      perfectRepair: "Perfect Repair",
+      restoredHeading: "Restored user behaviors",
+      hitAnnouncement: (damage, xp, combo) => `Newly verified objectives dealt ${damage} boss damage and earned ${xp} XP. Consecutive-pass combo ${combo}. Accessibility Critical Hit.`,
+      storageFallback: "Browser storage is unavailable, so progress is kept for this session only. You can keep playing the mission.",
+      soundOn: "Battle sound on. Mute sound",
+      soundMuted: "Battle sound muted. Turn sound on",
+      mute: "Mute",
+      unmute: "Sound on",
+      teaserLabel: "Future mission teaser",
+      teaserTitle: "The Label Labyrinth",
+      teaserBody: "A future mission about form errors and accessible names is being prepared.",
+      unavailable: "Unavailable for now",
+    },
     codeLab: {
       eyebrow: "Safe code lab",
       heading: "Code Lab",

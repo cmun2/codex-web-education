@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { battleReducer, initialBattleState } from "@/lib/domain/battle";
+import { battleReducer, initialBattleState, rankForAttempts } from "@/lib/domain/battle";
 import {
   bossHealth,
   missionComplete,
+  xpForObjectives,
   type DialogCodeState,
   type MissionObjectiveId,
   type ObjectiveResult,
@@ -89,20 +90,44 @@ describe("allowlisted Code Lab", () => {
 
 describe("battle domain", () => {
   it("starts fresh and applies damage only for newly verified objectives", () => {
-    expect(initialBattleState).toMatchObject({ phase: "landing", hp: 100, fixture: "broken", results: [], history: [] });
+    expect(initialBattleState).toMatchObject({ phase: "landing", hp: 100, fixture: "broken", results: [], history: [], xpEarned: 0, combo: 0 });
     const identityOnly = objectiveIds.map((id) => result(id, id === "identity"));
     const first = battleReducer(initialBattleState, { type: "RESULTS", result: verification(1, identityOnly) });
     expect(first.hp).toBe(70);
     expect(first.verifiedObjectiveIds).toEqual(["identity"]);
+    expect(first).toMatchObject({ xpEarned: 100, combo: 1, attempt: 2 });
+    expect(first.lastHit).toMatchObject({ damage: 30, xp: 100, accessibilityCriticalHit: true });
 
     const repeated = battleReducer(first, { type: "RESULTS", result: verification(2, identityOnly) });
     expect(repeated.hp).toBe(70);
     expect(repeated.history).toHaveLength(2);
+    expect(repeated).toMatchObject({ xpEarned: 100, combo: 0, lastHit: null, attempt: 3 });
 
     const focusOnly = objectiveIds.map((id) => result(id, id === "focus"));
     const next = battleReducer(repeated, { type: "RESULTS", result: verification(3, focusOnly) });
     expect(next.hp).toBe(35);
     expect(next.verifiedObjectiveIds).toEqual(["identity", "focus"]);
+    expect(next).toMatchObject({ xpEarned: 200, combo: 1 });
+  });
+
+  it("builds a consecutive-pass combo, counts attempts, ranks victory, and awards Perfect Repair truthfully", () => {
+    const identityOnly = objectiveIds.map((id) => result(id, id === "identity"));
+    const first = battleReducer(initialBattleState, { type: "RESULTS", result: verification(1, identityOnly) });
+    const remaining = objectiveIds.map((id) => result(id, id !== "identity"));
+    const victory = battleReducer(first, { type: "RESULTS", result: verification(2, remaining) });
+    expect(victory).toMatchObject({ phase: "victory", xpEarned: 300, combo: 3, rank: "A", perfectRepair: false, attempt: 3 });
+    expect(victory.history).toHaveLength(2);
+    expect(victory.lastHit).toMatchObject({ damage: 70, xp: 200, combo: 3 });
+
+    const perfect = battleReducer(initialBattleState, {
+      type: "RESULTS",
+      result: verification(1, objectiveIds.map((id) => result(id, true))),
+    });
+    expect(perfect).toMatchObject({ phase: "victory", hp: 0, xpEarned: 300, combo: 3, rank: "S", perfectRepair: true });
+    expect(rankForAttempts(2)).toBe("A");
+    expect(rankForAttempts(3)).toBe("B");
+    expect(rankForAttempts(4)).toBe("C");
+    expect(xpForObjectives(["identity", "focus", "keyboard"])).toBe(300);
   });
 
   it("keeps independent failures visible and completes only through verified results", () => {

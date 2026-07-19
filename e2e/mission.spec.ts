@@ -76,6 +76,11 @@ test("learner iterates through independent failures and defeats the boss only wi
 
   await expect(page.getByTestId("boss-hp")).toHaveText("0");
   await expect(page.getByText("Victory — all browser checks passed")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Boss Defeated" })).toBeFocused();
+  await expect(page.getByText("XP earned 300")).toBeVisible();
+  await expect(page.getByText("Mission rank C")).toBeVisible();
+  await expect(page.getByText("Accessibility Critical Hit", { exact: true })).toBeVisible();
+  await expect(page.getByText("Unavailable for now")).toBeVisible();
   await expect(page.getByRole("button", { name: "Attempt 4 · 3/3" })).toBeVisible();
   await expect(page.getByText("Captured region: mission-fixture")).toBeVisible();
 
@@ -140,6 +145,66 @@ test("switches to Korean, persists the choice, and exposes localized Code Lab ac
   await expect(page.getByRole("button", { name: "변경 사항 적용" })).toBeVisible();
   await expect(page.getByRole("button", { name: "검사 실행" })).toBeVisible();
   expect(browserErrors).toEqual([]);
+});
+
+test("persists mute without making sound necessary and honors reduced motion", async ({ page }) => {
+  await page.getByRole("button", { name: "English" }).click();
+  const mute = page.getByRole("button", { name: "Battle sound on. Mute sound" });
+  await expect(mute).toBeVisible();
+  await mute.click();
+  await expect(page.getByRole("button", { name: "Battle sound muted. Turn sound on" })).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Battle sound muted. Turn sound on" })).toBeVisible();
+
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await enterEnglishMission(page);
+  await expect(page.getByRole("heading", { name: "Code Lab" })).toBeVisible();
+  const healthTransition = await page.locator(".health div").evaluate((element) => getComputedStyle(element).transitionDuration);
+  expect(Number.parseFloat(healthTransition)).toBeLessThanOrEqual(0.00001);
+});
+
+test("continues in memory when accessing the localStorage getter is blocked", async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(window, "localStorage", {
+      configurable: true,
+      get: () => {
+        throw new DOMException("blocked", "SecurityError");
+      },
+    });
+  });
+  await page.reload();
+  await page.getByRole("button", { name: "English" }).click();
+  await expect(page.getByRole("status")).toContainText("Browser storage is unavailable");
+  await page.getByRole("button", { name: "Battle sound on. Mute sound" }).click();
+  await expect(page.getByRole("button", { name: "Battle sound muted. Turn sound on" })).toBeVisible();
+  await page.getByRole("button", { name: "Start Mission" }).click();
+  await expect(page.getByRole("heading", { name: "Keyboard Trap Boss" })).toBeFocused();
+});
+
+test("shows a truthful Perfect Repair victory and does not duplicate stored XP on replay", async ({ page }) => {
+  await enterEnglishMission(page);
+  await page.getByLabel("Dialog role").selectOption("dialog");
+  await page.getByLabel("Use aria-modal").check();
+  await page.getByLabel("aria-labelledby").selectOption("dialog-title");
+  await page.getByLabel("aria-describedby").selectOption("dialog-description");
+  await page.getByLabel("Close on Escape").check();
+  await page.getByLabel("Contain focus").check();
+  await page.getByLabel("Restore focus").check();
+  await page.getByRole("button", { name: "Apply Changes" }).click();
+  await page.getByRole("button", { name: "Run Checks" }).click();
+  await expect(page.getByRole("heading", { name: "Boss Defeated" })).toBeFocused();
+  await expect(page.getByText("Perfect Repair")).toBeVisible();
+  await expect(page.getByText("Mission rank S")).toBeVisible();
+
+  await page.getByRole("button", { name: "Replay mission" }).first().click();
+  await expect(page.getByRole("button", { name: "Start Mission" })).toBeVisible();
+  const storedXp = await page.evaluate(() => {
+    const raw = window.localStorage.getItem("frontend-debugging-arena-progression-v1");
+    if (raw === null) return null;
+    const parsed: unknown = JSON.parse(raw);
+    return typeof parsed === "object" && parsed !== null && "totalXp" in parsed ? parsed.totalXp : null;
+  });
+  expect(storedXp).toBe(300);
 });
 
 test.describe("Korean browser default", () => {

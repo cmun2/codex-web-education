@@ -67,7 +67,27 @@ type Dictionary = {
   results: { heading: string; pending: string; passed: string; failed: string; checks: string; errors: string; none: string; behavior: string; codeArea: string; verifiedResult: string };
   checkLabels: Record<CheckCode, string>;
   failureCodes: Record<FailureCode, string>;
-  coach: { label: string; source: string; hint: string; whyLabel: string; why: string; inspectLabel: string; inspect: string; taunt: string; error: string };
+  coach: {
+    label: string;
+    eyebrow: string;
+    heading: string;
+    description: string;
+    ask: string;
+    loading: string;
+    loaded: string;
+    revealed: string;
+    afterFailure: string;
+    demoLabel: string;
+    localLabel: string;
+    fallback: string;
+    observationLabel: string;
+    hintLabel: string;
+    whyLabel: string;
+    inspectLabel: string;
+    returnToCodeLab: string;
+    progress: (level: 1 | 2 | 3) => string;
+    error: string;
+  };
   debrief: { eyebrow: string; heading: string; semanticsHeading: string; semantics: string; behaviorHeading: string; behavior: string };
   announcements: Record<"landing" | "briefing" | "broken-preview" | "attempting" | "verifying" | "partial-success" | "failure" | "victory" | "debrief", string>;
 };
@@ -156,7 +176,27 @@ export const dictionaries = {
     results: { heading: "브라우저 검사 결과", pending: "대기", passed: "통과", failed: "실패", checks: "확인", errors: "오류", none: "검사 전", behavior: "영향받는 사용자 동작", codeArea: "관련 코드 영역", verifiedResult: "검증 결과" },
     checkLabels: { DIALOG_SEMANTICS_VERIFIED: "역할, 모달 상태, 이름과 설명 참조를 실제 DOM에서 확인했습니다.", FOCUS_LOOP_VERIFIED: "초기 포커스와 양방향 순환을 실제 키보드 이벤트로 확인했습니다.", ESCAPE_AND_RETURN_VERIFIED: "Escape 닫기와 열기 버튼으로의 포커스 복귀를 확인했습니다." },
     failureCodes: { DIALOG_IDENTITY_MISSING: "대화상자의 역할, 모달 상태, 이름 또는 설명이 없습니다.", FOCUS_CONTAINMENT_MISSING: "포커스가 대화상자 안에 있지 않거나 순환 계약이 없습니다.", KEYBOARD_ACTIONS_MISSING: "키보드 닫기, 동작 또는 포커스 복귀 계약이 없습니다." },
-    coach: { label: "결정적 데모 코치", source: "데모 코치", hint: "대화상자 계약부터 시작하세요. 이름을 연결하고 모달임을 표시한 뒤 포커스를 안으로 옮기세요.", whyLabel: "중요한 이유", why: "그렇지 않으면 키보드 및 보조 기술 사용자가 위치와 맥락을 잃습니다.", inspectLabel: "다음 확인", inspect: "대화상자 요소, 이름·설명 참조, 첫 번째 포커스 가능 컨트롤을 확인하세요.", taunt: "보기 좋은 모달도 키보드가 빠져나가면 여전히 함정이지!", error: "데모 코치 답변을 불러오지 못했습니다. 미션은 계속 진행할 수 있습니다." },
+    coach: {
+      label: "비주얼 디버그 코치 응답",
+      eyebrow: "요청할 때만 표시",
+      heading: "비주얼 디버그 코치",
+      description: "실패한 시도 스냅샷을 선택한 뒤 한 번에 한 단계의 힌트를 요청하세요.",
+      ask: "비주얼 코치에게 묻기",
+      loading: "선택한 스냅샷을 살펴보는 중…",
+      loaded: "비주얼 코치가 단계별 힌트 하나를 준비했습니다.",
+      revealed: "이 시도의 힌트 표시됨",
+      afterFailure: "실패한 목표가 있는 시도를 선택하면 코치에게 물을 수 있습니다.",
+      demoLabel: "데모 코치",
+      localLabel: "로컬 비전 코치",
+      fallback: "로컬 비전 코치를 사용할 수 없어 신뢰할 수 있는 데모 코치로 전환했습니다.",
+      observationLabel: "시각적 관찰",
+      hintLabel: "이번 힌트",
+      whyLabel: "중요한 이유",
+      inspectLabel: "다음 확인",
+      returnToCodeLab: "Code Lab으로 돌아가기",
+      progress: (level) => `단계별 힌트 ${level} / 3`,
+      error: "코치 응답을 불러오지 못했습니다. 미션은 계속 진행할 수 있습니다.",
+    },
     debrief: { eyebrow: "미션 완료", heading: "학습 정리", semanticsHeading: "의미가 먼저입니다", semantics: "대화상자 역할과 접근 가능한 이름은 보조 기술에 목적과 맥락을 전달합니다. 화면 모양만으로는 이 계약을 만들 수 없습니다.", behaviorHeading: "사용자 동작으로 검증하세요", behavior: "포커스는 모달 안으로 들어가 머물고 닫을 때 트리거로 돌아가야 합니다. 비슷한 버그에서는 역할, 이름과 설명 참조, 포커스 순서, Escape 닫기, 포커스 복귀를 확인하세요." },
     announcements: { landing: "미션 시작 화면", briefing: "미션 브리핑", "broken-preview": "고장 난 픽스처 준비 완료. 검사는 실행되지 않았습니다.", attempting: "코드 변경 사항을 적용했습니다.", verifying: "브라우저 검사를 실행합니다.", "partial-success": "일부 검사만 통과했습니다.", failure: "브라우저 검사가 실패했습니다.", victory: "모든 검사 통과. 보스를 쓰러뜨렸습니다.", debrief: "학습 정리" },
   },
@@ -243,7 +283,27 @@ export const dictionaries = {
     results: { heading: "Browser check results", pending: "Pending", passed: "Passed", failed: "Failed", checks: "Verified", errors: "Errors", none: "Not run", behavior: "Affected user behavior", codeArea: "Relevant code area", verifiedResult: "Verified result" },
     checkLabels: { DIALOG_SEMANTICS_VERIFIED: "Verified role, modal state, name, and description references in the rendered DOM.", FOCUS_LOOP_VERIFIED: "Verified initial focus and both loop directions with keyboard events.", ESCAPE_AND_RETURN_VERIFIED: "Verified Escape dismissal and focus return to the opener." },
     failureCodes: { DIALOG_IDENTITY_MISSING: "Dialog role, modal state, name, or description is missing.", FOCUS_CONTAINMENT_MISSING: "Focus is outside the dialog or the focus-loop contract is missing.", KEYBOARD_ACTIONS_MISSING: "Keyboard close, action, or focus-return contract is missing." },
-    coach: { label: "Deterministic demo coach", source: "Demo Coach", hint: "Start with the dialog contract: connect its name, mark it modal, then move focus inside.", whyLabel: "Why it matters", why: "Keyboard and assistive-technology users otherwise lose their place or context.", inspectLabel: "Inspect next", inspect: "Inspect the dialog element, its label and description references, and the first focusable control.", taunt: "A pretty modal is still my trap if your keyboard can escape!", error: "The demo coach response could not load. You can continue the mission." },
+    coach: {
+      label: "Visual debug coach response",
+      eyebrow: "Shown only on request",
+      heading: "Visual Debug Coach",
+      description: "Select a failed attempt snapshot, then request one progressive hint at a time.",
+      ask: "Ask Visual Coach",
+      loading: "Inspecting the selected snapshot…",
+      loaded: "The visual coach prepared one progressive hint.",
+      revealed: "Hint revealed for this attempt",
+      afterFailure: "Select an attempt with a failed objective to ask the coach.",
+      demoLabel: "Demo Coach",
+      localLabel: "Local Vision Coach",
+      fallback: "Local Vision Coach was unavailable, so the reliable Demo Coach answered instead.",
+      observationLabel: "Visual observation",
+      hintLabel: "This hint",
+      whyLabel: "Why it matters",
+      inspectLabel: "Inspect next",
+      returnToCodeLab: "Return to Code Lab",
+      progress: (level) => `Progressive hint ${level} of 3`,
+      error: "The coach response could not load. You can continue the mission.",
+    },
     debrief: { eyebrow: "Mission complete", heading: "Learning debrief", semanticsHeading: "Meaning comes first", semantics: "Dialog semantics and an accessible name give assistive technology a clear purpose and context. Visual appearance alone cannot establish that contract.", behaviorHeading: "Verify user behavior", behavior: "Focus must enter a modal, remain there, and return to its trigger when it closes. For a similar bug, inspect role, name and description references, focus order, Escape close, and focus restoration." },
     announcements: { landing: "Mission landing screen", briefing: "Mission briefing", "broken-preview": "Broken fixture ready. Checks have not run.", attempting: "Code changes applied.", verifying: "Running browser checks.", "partial-success": "Some browser checks passed.", failure: "Browser checks failed.", victory: "All checks passed. Boss defeated.", debrief: "Learning debrief" },
   },

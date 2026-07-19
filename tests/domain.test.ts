@@ -9,7 +9,7 @@ import {
   type SnapshotEvidence,
   type VerificationResult,
 } from "@/lib/domain/mission";
-import { DeterministicCoachProvider } from "@/lib/domain/providers";
+import { coachMissionId, DeterministicCoachProvider } from "@/lib/domain/providers";
 import {
   AllowlistedDialogCodeLab,
   brokenDialogCode,
@@ -45,7 +45,7 @@ const snapshotFor = (attemptNumber: number, objectives: ObjectiveResult[]): Snap
   dimensions: { width: 480, height: 440 },
   codeState: { ...repairedDialogCode },
   objectiveResults: objectives,
-  imageDataUrl: "data:image/svg+xml,test",
+  imageDataUrl: "data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%2F%3E",
 });
 
 const verification = (attemptNumber: number, objectives: ObjectiveResult[]): VerificationResult => ({
@@ -118,7 +118,19 @@ describe("battle domain", () => {
   });
 
   it("uses the truthful deterministic coach provider", async () => {
-    await expect(new DeterministicCoachProvider().coach({ objectiveStatuses: [], attempt: 1 })).resolves.toEqual({ source: "deterministic-demo", hintCode: "dialog-contract" });
+    await expect(new DeterministicCoachProvider().coach({
+      missionId: coachMissionId,
+      failedObjectiveIds: ["identity"],
+      codeState: brokenDialogCode,
+      snapshot: {
+        contract: "fixture-region-v1",
+        regionTestId: "mission-fixture",
+        dimensions: { width: 480, height: 440 },
+        imageDataUrl: "data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%2F%3E",
+      },
+      attemptNumber: 1,
+      locale: "en",
+    })).resolves.toMatchObject({ provider: "demo", usedFallback: false, hintLevel: 1 });
   });
 });
 

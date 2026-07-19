@@ -3,6 +3,7 @@
 import type { DialogCodeState } from "@/lib/domain/mission";
 import type { CodeDiffLine } from "@/lib/mission/code-lab";
 import type { MissionDictionary } from "@/lib/i18n/dictionaries";
+import type { RefObject } from "react";
 
 type CodeLabPanelProps = {
   copy: MissionDictionary["codeLab"];
@@ -18,6 +19,7 @@ type CodeLabPanelProps = {
   onRunChecks: () => void;
   onReset: () => void;
   onToggleDiff: () => void;
+  headingRef: RefObject<HTMLHeadingElement | null>;
 };
 
 export function CodeLabPanel({
@@ -34,6 +36,7 @@ export function CodeLabPanel({
   onRunChecks,
   onReset,
   onToggleDiff,
+  headingRef,
 }: CodeLabPanelProps) {
   const setBoolean = (field: "ariaModal" | "escapeCloses" | "focusContainment" | "focusRestoration", value: boolean) => {
     onChange({ ...draft, [field]: value });
@@ -44,7 +47,7 @@ export function CodeLabPanel({
       <div className="section-heading-row">
         <div>
           <p className="eyebrow">{copy.eyebrow}</p>
-          <h2 id="code-lab-heading">{copy.heading}</h2>
+          <h2 id="code-lab-heading" ref={headingRef} tabIndex={-1}>{copy.heading}</h2>
           <p>{copy.description}</p>
         </div>
         <span className="safe-badge">{copy.safeBadge}</span>

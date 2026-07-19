@@ -108,11 +108,15 @@ h2 { margin-top: 0; font-size: 1.25rem; }
 .status-pill { align-self: start; border-radius: 999px; padding: 3px 7px; background: #303a5d; color: #e1e5f7; font-size: .72rem; font-weight: 800; }
 .status-passed { background: #175733; color: #baf5d0; }
 .status-failed { background: #6a2436; color: #ffd5df; }
-.objectives-panel > .secondary-action { width: 100%; margin-top: 20px; }
 .coach { margin-top: 16px; border-left: 3px solid var(--success); padding: 2px 0 2px 13px; color: var(--muted); }
 .coach strong { color: #fff; }
 .coach p { font-size: .88rem; line-height: 1.5; }
 .coach i { color: var(--warning); font-size: .88rem; }
+.coach h5 { margin: 16px 0 4px; color: #fff; font-size: .83rem; }
+.coach .text-action { display: block; margin-top: 14px; padding-left: 0; }
+.coach-heading-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.coach-heading-row span { border-radius: 999px; padding: 4px 8px; background: #303a5d; color: #e5e8f8; font-size: .75rem; font-weight: 800; }
+.fallback-note { border-radius: 8px; padding: 9px 10px; background: #443718; color: #ffe6a3; }
 .error-message { color: #ffd5df; }
 
 .preview { position: relative; min-height: 440px; }
@@ -178,6 +182,10 @@ h2 { margin-top: 0; font-size: 1.25rem; }
 .action-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
 .history-section { margin-top: 24px; border-top: 1px solid var(--line); padding-top: 22px; }
 .history-empty { color: var(--muted); }
+.visual-coach { margin-top: 24px; border-top: 1px solid var(--line); padding-top: 22px; }
+.visual-coach h4 { margin: 0 0 6px; font-size: 1.12rem; }
+.visual-coach > .secondary-action { margin-top: 15px; }
+.coach-empty { color: var(--muted); font-size: .88rem; }
 .attempt-tabs { display: flex; flex-wrap: wrap; gap: 8px; }
 .attempt-tabs button { border: 1px solid #53618d; border-radius: 999px; padding: 7px 11px; background: #202a49; color: #dce2f8; cursor: pointer; }
 .attempt-tabs button[aria-pressed="true"] { border-color: #a9a0ff; background: #4b3f9b; color: #fff; }

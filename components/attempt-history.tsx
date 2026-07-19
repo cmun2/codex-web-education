@@ -1,12 +1,20 @@
 "use client";
 
 import Image from "next/image";
-import { useState } from "react";
 import type { VerificationResult } from "@/lib/domain/mission";
 import type { MissionDictionary } from "@/lib/i18n/dictionaries";
 
-export function AttemptHistory({ history, copy }: { history: readonly VerificationResult[]; copy: MissionDictionary["history"] }) {
-  const [selectedAttempt, setSelectedAttempt] = useState<number | null>(null);
+export function AttemptHistory({
+  history,
+  copy,
+  selectedAttempt,
+  onSelectAttempt,
+}: {
+  history: readonly VerificationResult[];
+  copy: MissionDictionary["history"];
+  selectedAttempt: number | null;
+  onSelectAttempt: (attempt: number) => void;
+}) {
 
   if (history.length === 0) return <p className="history-empty">{copy.empty}</p>;
   const selected = history.find((entry) => entry.attempt.number === selectedAttempt) ?? history[history.length - 1];
@@ -20,7 +28,7 @@ export function AttemptHistory({ history, copy }: { history: readonly Verificati
             type="button"
             aria-pressed={entry.attempt.number === selected.attempt.number}
             key={entry.attempt.number}
-            onClick={() => setSelectedAttempt(entry.attempt.number)}
+            onClick={() => onSelectAttempt(entry.attempt.number)}
           >
             {copy.attempt(entry.attempt.number)} · {entry.objectives.filter((objective) => objective.status === "passed").length}/3
           </button>

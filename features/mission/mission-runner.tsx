@@ -4,9 +4,10 @@ import { useEffect, useReducer, useRef, useState, useSyncExternalStore } from "r
 import { AttemptHistory } from "@/components/attempt-history";
 import { CodeLabPanel } from "@/components/code-lab";
 import { MissionDialog } from "@/components/mission-dialog";
+import { VisualCoach } from "@/components/visual-coach";
 import { battleReducer, initialBattleState, type MissionPhase } from "@/lib/domain/battle";
-import { keyboardTrapObjectives, type ObjectiveResult, type ObjectiveStatus } from "@/lib/domain/mission";
-import { DeterministicCoachProvider, type CoachInsight } from "@/lib/domain/providers";
+import { keyboardTrapObjectives, type ObjectiveResult, type ObjectiveStatus, type VerificationResult } from "@/lib/domain/mission";
+import { coachMissionId, type CoachInsight } from "@/lib/domain/providers";
 import { dictionaries, statusLabel, type Locale, type MissionDictionary } from "@/lib/i18n/dictionaries";
 import { getLocaleSnapshot, getServerLocaleSnapshot, selectLocale, subscribeToLocale } from "@/lib/i18n/locale";
 import { AllowlistedDialogCodeLab, brokenDialogCode, isFullyRepaired } from "@/lib/mission/code-lab";
@@ -76,6 +77,9 @@ export function MissionRunner() {
   const locale = useSyncExternalStore(subscribeToLocale, getLocaleSnapshot, getServerLocaleSnapshot);
   const [coach, setCoach] = useState<CoachInsight | null>(null);
   const [coachError, setCoachError] = useState(false);
+  const [coachLoading, setCoachLoading] = useState(false);
+  const [coachedAttempt, setCoachedAttempt] = useState<number | null>(null);
+  const [selectedAttempt, setSelectedAttempt] = useState<number | null>(null);
   const [draftCode, setDraftCode] = useState({ ...brokenDialogCode });
   const [appliedCode, setAppliedCode] = useState({ ...brokenDialogCode });
   const [validationErrors, setValidationErrors] = useState<readonly string[]>([]);
@@ -84,6 +88,8 @@ export function MissionRunner() {
   const [checking, setChecking] = useState(false);
   const rootRef = useRef<HTMLElement>(null);
   const phaseHeadingRef = useRef<HTMLHeadingElement>(null);
+  const codeLabHeadingRef = useRef<HTMLHeadingElement>(null);
+  const coachRequestRef = useRef(0);
   const previousPhaseRef = useRef(state.phase);
   const copy = dictionaries[locale];
 
@@ -121,6 +127,11 @@ export function MissionRunner() {
         codeState: appliedCode,
         objectiveResults,
       });
+      setSelectedAttempt(state.attempt);
+      setCoach(null);
+      setCoachError(false);
+      coachRequestRef.current += 1;
+      setCoachLoading(false);
       dispatch({
         type: "RESULTS",
         result: { attempt: { number: state.attempt, codeState: { ...appliedCode } }, objectives: objectiveResults, snapshot },
@@ -142,19 +153,87 @@ export function MissionRunner() {
   const resetMissionUi = () => {
     setCoach(null);
     setCoachError(false);
+    setCoachLoading(false);
+    setCoachedAttempt(null);
+    setSelectedAttempt(null);
     setDraftCode({ ...brokenDialogCode });
     setAppliedCode({ ...brokenDialogCode });
     setValidationErrors([]);
     setShowDiff(false);
     setOpenRequest(0);
+    coachRequestRef.current += 1;
   };
 
+  const selectedVerification: VerificationResult | undefined =
+    state.history.find((entry) => entry.attempt.number === selectedAttempt) ?? state.history[state.history.length - 1];
+
   const askCoach = async () => {
+    if (!selectedVerification || coachLoading) return;
+    const requestId = coachRequestRef.current + 1;
+    coachRequestRef.current = requestId;
     setCoachError(false);
+    setCoachLoading(true);
     try {
-      setCoach(await new DeterministicCoachProvider().coach({ objectiveStatuses: state.results.map((result) => result.status), attempt: state.attempt }));
+      const response = await fetch("/api/coach", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          missionId: coachMissionId,
+          failedObjectiveIds: selectedVerification.objectives
+            .filter((result) => result.status === "failed")
+            .map((result) => result.objectiveId),
+          codeState: selectedVerification.attempt.codeState,
+          snapshot: {
+            contract: selectedVerification.snapshot.contract,
+            regionTestId: selectedVerification.snapshot.regionTestId,
+            dimensions: selectedVerification.snapshot.dimensions,
+            imageDataUrl: selectedVerification.snapshot.imageDataUrl,
+          },
+          attemptNumber: selectedVerification.attempt.number,
+          locale,
+        }),
+      });
+      if (!response.ok) throw new Error("Coach request failed");
+      const insight: unknown = await response.json();
+      if (
+        typeof insight !== "object" ||
+        insight === null ||
+        !("observation" in insight) ||
+        !("hint" in insight) ||
+        !("whyItMatters" in insight) ||
+        !("inspectNext" in insight) ||
+        !("bossTaunt" in insight) ||
+        !("provider" in insight) ||
+        !("usedFallback" in insight) ||
+        !("hintLevel" in insight)
+      ) throw new Error("Coach response invalid");
+      const candidate = insight;
+      if (
+        typeof candidate.observation !== "string" ||
+        typeof candidate.hint !== "string" ||
+        typeof candidate.whyItMatters !== "string" ||
+        typeof candidate.inspectNext !== "string" ||
+        typeof candidate.bossTaunt !== "string" ||
+        (candidate.provider !== "demo" && candidate.provider !== "local-vision") ||
+        typeof candidate.usedFallback !== "boolean" ||
+        (candidate.hintLevel !== 1 && candidate.hintLevel !== 2 && candidate.hintLevel !== 3)
+      ) throw new Error("Coach response invalid");
+      if (coachRequestRef.current !== requestId) return;
+      setCoach({
+        observation: candidate.observation,
+        hint: candidate.hint,
+        whyItMatters: candidate.whyItMatters,
+        inspectNext: candidate.inspectNext,
+        bossTaunt: candidate.bossTaunt,
+        provider: candidate.provider,
+        usedFallback: candidate.usedFallback,
+        hintLevel: candidate.hintLevel,
+      });
+      setCoachedAttempt(selectedVerification.attempt.number);
     } catch {
-      setCoachError(true);
+      if (coachRequestRef.current === requestId) setCoachError(true);
+    } finally {
+      if (coachRequestRef.current === requestId) setCoachLoading(false);
     }
   };
 
@@ -208,9 +287,6 @@ export function MissionRunner() {
             <section className="panel objectives-panel" aria-labelledby="objectives-heading">
               <h2 id="objectives-heading">{copy.briefing.objectivesHeading}</h2>
               <ObjectiveList copy={copy} results={state.results} />
-              <button className="secondary-action" type="button" onClick={askCoach}>{copy.actions.askCoach}</button>
-              {coach && <aside className="coach" aria-live="polite" aria-label={copy.coach.label}><strong>{copy.coach.source}</strong><p>{copy.coach.hint}</p><p><b>{copy.coach.whyLabel}:</b> {copy.coach.why}</p><p><b>{copy.coach.inspectLabel}:</b> {copy.coach.inspect}</p><i>{copy.coach.taunt}</i></aside>}
-              {coachError && <p className="error-message" role="alert">{copy.coach.error}</p>}
             </section>
 
             <MissionDialog codeState={appliedCode} copy={copy.fixture} openRequest={openRequest} onPrimary={() => undefined} />
@@ -238,13 +314,38 @@ export function MissionRunner() {
             onRunChecks={runChecks}
             onReset={resetCode}
             onToggleDiff={() => setShowDiff((visible) => !visible)}
+            headingRef={codeLabHeadingRef}
           />
 
           <section className="panel verification-panel" aria-labelledby="verification-heading">
             <div className="section-heading-row"><div><h2 id="verification-heading">{copy.console.heading}</h2><p>{copy.console.deterministic}</p></div><span className="attempt-label">#{state.attempt}</span></div>
             <ul className="event-feed">{state.feed.length === 0 ? <li>{copy.console.empty}</li> : state.feed.map((code, index) => <li key={`${code}-${index}`}>{copy.feed[code]}</li>)}</ul>
             {state.results.length > 0 && <div className="results-summary"><h3>{copy.results.heading}</h3><ObjectiveList copy={copy} results={state.results} detailed /></div>}
-            <div className="history-section"><h3>{copy.history.heading}</h3><AttemptHistory history={state.history} copy={copy.history} /></div>
+            <div className="history-section">
+              <h3>{copy.history.heading}</h3>
+              <AttemptHistory history={state.history} copy={copy.history} selectedAttempt={selectedAttempt} onSelectAttempt={(attempt) => {
+                setSelectedAttempt(attempt);
+                setCoach(null);
+                setCoachError(false);
+                setCoachedAttempt(null);
+                coachRequestRef.current += 1;
+                setCoachLoading(false);
+              }} />
+              <VisualCoach
+                copy={copy.coach}
+                insight={coach}
+                loading={coachLoading}
+                error={coachError}
+                canAsk={Boolean(selectedVerification?.objectives.some((result) => result.status === "failed"))}
+                hintAlreadyRevealed={coachedAttempt === selectedVerification?.attempt.number}
+                onAsk={askCoach}
+                onReturnToCodeLab={() => {
+                  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+                  codeLabHeadingRef.current?.scrollIntoView({ block: "start", behavior: reducedMotion ? "auto" : "smooth" });
+                  codeLabHeadingRef.current?.focus();
+                }}
+              />
+            </div>
             {state.phase === "victory" && <button className="primary-action" type="button" onClick={() => dispatch({ type: "SHOW_DEBRIEF" })}>{copy.actions.seeDebrief}</button>}
           </section>
         </>

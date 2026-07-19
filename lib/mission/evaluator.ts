@@ -92,4 +92,10 @@ export class DialogObjectiveEvaluator implements ObjectiveEvaluator {
       resultFor("keyboard", keyboard, "ESCAPE_AND_RETURN_VERIFIED", "KEYBOARD_ACTIONS_MISSING"),
     ];
   }
+
+  async cleanup(root: HTMLElement): Promise<void> {
+    const dialog = currentDialog(root);
+    dialog?.querySelector<HTMLButtonElement>("[data-action='close']")?.click();
+    if (dialog) await afterRender();
+  }
 }

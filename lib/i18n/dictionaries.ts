@@ -7,7 +7,7 @@ export type Locale = (typeof supportedLocales)[number];
 
 type Dictionary = {
   language: { label: string; korean: string; english: string };
-  product: { workingTitle: string; mission: string; proposition: string; loopLabel: string; loop: readonly [string, string, string] };
+  product: { workingTitle: string; mission: string; proposition: string; runtimeNote: string; loopLabel: string; loop: readonly [string, string, string] };
   landing: { heading: string; body: string; start: string };
   briefing: { eyebrow: string; heading: string; body: string; objectivesHeading: string; enter: string };
   objectives: Record<MissionObjectiveId, { title: string; description: string; behavior: string; codeArea: string; damage: string }>;
@@ -87,7 +87,7 @@ type Dictionary = {
     metadata: (attempt: number, locale: "ko" | "en", passed: number, capturedAt: string) => string;
     region: string;
   };
-  console: { heading: string; deterministic: string; empty: string };
+  console: { heading: string; deterministic: string; attempt: (attempt: number) => string; empty: string };
   feed: Record<"entered-preview" | "changes-applied" | "code-reset" | "verification-started" | "verification-failed" | "verification-partial" | "verification-passed", string>;
   results: { heading: string; pending: string; passed: string; failed: string; checks: string; errors: string; none: string; behavior: string; codeArea: string; verifiedResult: string };
   checkLabels: Record<CheckCode, string>;
@@ -124,6 +124,7 @@ export const dictionaries = {
       workingTitle: "프론트엔드 디버깅 아레나 — 작업명",
       mission: "첫 번째 미션 · 키보드 트랩 보스",
       proposition: "실제 프론트엔드 버그를 고치세요. 통과한 브라우저 검사 하나마다 보스가 피해를 입습니다.",
+      runtimeNote: "결정적 RepairProvider와 데모 코치는 계정이나 데이터베이스 없이 동작합니다. 선택 사항인 로컬 비전 코치만 서버의 Ollama를 사용하며, Codex와 GPT-5.6은 개발 도구였을 뿐 배포된 수리 서비스가 아닙니다.",
       loopLabel: "미션 진행 방식",
       loop: ["고장 난 인터페이스 살펴보기", "동작 수리하기", "검사를 통과해 보스 쓰러뜨리기"],
     },
@@ -189,7 +190,7 @@ export const dictionaries = {
     codeLab: {
       eyebrow: "안전한 코드 실습",
       heading: "Code Lab",
-      description: "허용된 구현 값만 바꾸세요. 아래 코드는 설명용 React 형태이며 실행하거나 평가하지 않습니다.",
+      description: "허용된 구현 값만 바꾸세요. 아래 코드는 설명용 React 형태이며 실행하거나 평가하지 않습니다. 이 실습은 프로덕션 샌드박스가 아닙니다.",
       safeBadge: "허용 목록 DSL",
       controlsLegend: "대화상자 구현 값",
       fields: { dialogRole: "대화상자 role", ariaModal: "aria-modal 사용", labelledBy: "aria-labelledby", describedBy: "aria-describedby", escapeCloses: "Escape로 닫기", focusContainment: "포커스 순환", focusRestoration: "포커스 복귀" },
@@ -220,7 +221,7 @@ export const dictionaries = {
       metadata: (attempt, locale, passed, capturedAt) => `시도 ${attempt} · ${locale} · 통과 ${passed}/3 · ${capturedAt}`,
       region: "캡처 영역",
     },
-    console: { heading: "검증 콘솔", deterministic: "결정적 데모 제공자", empty: "아직 검사를 실행하지 않았습니다." },
+    console: { heading: "검증 콘솔", deterministic: "결정적 RepairProvider + 브라우저 목표 평가기", attempt: (attempt) => `현재 시도 ${attempt}`, empty: "아직 검사를 실행하지 않았습니다." },
     feed: { "entered-preview": "고장 난 픽스처를 불러왔습니다. 검사는 아직 실행하지 않았습니다.", "changes-applied": "검증된 허용 목록 값을 픽스처에 적용했습니다.", "code-reset": "코드를 최초의 고장 난 값으로 초기화했습니다.", "verification-started": "렌더링된 UI에서 실제 키보드 동작을 확인합니다.", "verification-failed": "이번 시도에서 통과한 목표가 없습니다.", "verification-partial": "일부 목표만 통과했습니다. 보스 피해는 새로 통과한 목표로만 계산됩니다.", "verification-passed": "검증 누적 결과로 모든 목표를 통과해 키보드 트랩 보스를 쓰러뜨렸습니다." },
     results: { heading: "브라우저 검사 결과", pending: "대기", passed: "통과", failed: "실패", checks: "확인", errors: "오류", none: "검사 전", behavior: "영향받는 사용자 동작", codeArea: "관련 코드 영역", verifiedResult: "검증 결과" },
     checkLabels: { DIALOG_SEMANTICS_VERIFIED: "역할, 모달 상태, 이름과 설명 참조를 실제 DOM에서 확인했습니다.", FOCUS_LOOP_VERIFIED: "초기 포커스와 양방향 순환을 실제 키보드 이벤트로 확인했습니다.", ESCAPE_AND_RETURN_VERIFIED: "Escape 닫기와 열기 버튼으로의 포커스 복귀를 확인했습니다." },
@@ -255,6 +256,7 @@ export const dictionaries = {
       workingTitle: "Frontend Debugging Arena — Working Title",
       mission: "Mission one · Keyboard Trap Boss",
       proposition: "Fix real frontend bugs. Every passing browser check damages the boss.",
+      runtimeNote: "The deterministic RepairProvider and Demo Coach need no account or database. Only the optional Local Vision Coach uses server-local Ollama; Codex and GPT-5.6 were development tools, not deployed repair services.",
       loopLabel: "The mission loop",
       loop: ["Inspect the broken interface", "Repair the behavior", "Pass checks and defeat the boss"],
     },
@@ -320,7 +322,7 @@ export const dictionaries = {
     codeLab: {
       eyebrow: "Safe code lab",
       heading: "Code Lab",
-      description: "Change only allowlisted implementation values. The React-like code below is explanatory and is never executed or evaluated.",
+      description: "Change only allowlisted implementation values. The React-like code below is explanatory, is never executed or evaluated, and is not a production sandbox.",
       safeBadge: "Allowlisted DSL",
       controlsLegend: "Dialog implementation values",
       fields: { dialogRole: "Dialog role", ariaModal: "Use aria-modal", labelledBy: "aria-labelledby", describedBy: "aria-describedby", escapeCloses: "Close on Escape", focusContainment: "Contain focus", focusRestoration: "Restore focus" },
@@ -351,7 +353,7 @@ export const dictionaries = {
       metadata: (attempt, locale, passed, capturedAt) => `Attempt ${attempt} · ${locale} · ${passed}/3 passed · ${capturedAt}`,
       region: "Captured region",
     },
-    console: { heading: "Verification console", deterministic: "Deterministic demo provider", empty: "No checks have run yet." },
+    console: { heading: "Verification console", deterministic: "Deterministic RepairProvider + browser objective evaluator", attempt: (attempt) => `Current attempt ${attempt}`, empty: "No checks have run yet." },
     feed: { "entered-preview": "Broken fixture loaded. No checks have run yet.", "changes-applied": "Validated allowlisted values were applied to the fixture.", "code-reset": "Code reset to the original broken values.", "verification-started": "Checking real keyboard behavior in the rendered UI.", "verification-failed": "No objectives passed in this attempt.", "verification-partial": "Some objectives passed. Boss damage comes only from newly verified objectives.", "verification-passed": "Accumulated verification passed every objective. Keyboard Trap Boss defeated." },
     results: { heading: "Browser check results", pending: "Pending", passed: "Passed", failed: "Failed", checks: "Verified", errors: "Errors", none: "Not run", behavior: "Affected user behavior", codeArea: "Relevant code area", verifiedResult: "Verified result" },
     checkLabels: { DIALOG_SEMANTICS_VERIFIED: "Verified role, modal state, name, and description references in the rendered DOM.", FOCUS_LOOP_VERIFIED: "Verified initial focus and both loop directions with keyboard events.", ESCAPE_AND_RETURN_VERIFIED: "Verified Escape dismissal and focus return to the opener." },

@@ -138,14 +138,17 @@ export function diffDialogCode(before: DialogCodeState, after: DialogCodeState):
 export const isFullyRepaired = (state: DialogCodeState): boolean =>
   fieldNames.every((fieldName) => state[fieldName] === repairedDialogCode[fieldName]);
 
-export interface CodeLab {
+export interface RepairProvider {
+  readonly id: "deterministic";
   apply(input: unknown): CodeLabValidation;
   reset(): DialogCodeState;
   diff(state: DialogCodeState): CodeDiffLine[];
   source(state: DialogCodeState): string;
 }
 
-export class AllowlistedDialogCodeLab implements CodeLab {
+export class AllowlistedDialogCodeLab implements RepairProvider {
+  readonly id = "deterministic" as const;
+
   apply(input: unknown): CodeLabValidation {
     return validateDialogCodeState(input);
   }

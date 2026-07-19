@@ -172,4 +172,21 @@ describe("safe coach rendering", () => {
     expect(rendered.container.textContent).toContain("Local Vision Coach");
     expect(rendered.container.textContent).toContain("Progressive hint 2 of 3");
   });
+
+  it("labels deterministic fallback when the local provider is unavailable", () => {
+    const rendered = render(
+      <VisualCoach
+        copy={dictionaries.en.coach}
+        insight={{ ...structuredOutput, provider: "demo", usedFallback: true, hintLevel: 1 }}
+        loading={false}
+        error={false}
+        canAsk
+        hintAlreadyRevealed
+        onAsk={() => undefined}
+        onReturnToCodeLab={() => undefined}
+      />,
+    );
+    expect(rendered.container.textContent).toContain("Demo Coach");
+    expect(rendered.container.textContent).toContain("Local Vision Coach was unavailable");
+  });
 });

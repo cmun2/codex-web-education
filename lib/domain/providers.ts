@@ -45,6 +45,7 @@ export interface CoachProvider {
 
 export interface ObjectiveEvaluator {
   evaluate(root: HTMLElement): Promise<ObjectiveResult[]>;
+  cleanup(root: HTMLElement): Promise<void>;
 }
 
 export type CoachInputError =

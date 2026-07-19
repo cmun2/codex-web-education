@@ -29,7 +29,7 @@ export function VisualCoach({
       <div className="section-heading-row">
         <div>
           <p className="eyebrow">{copy.eyebrow}</p>
-          <h4 id="visual-coach-heading">{copy.heading}</h4>
+          <h3 id="visual-coach-heading">{copy.heading}</h3>
           <p>{copy.description}</p>
         </div>
       </div>
@@ -53,9 +53,9 @@ export function VisualCoach({
             <span>{copy.progress(insight.hintLevel)}</span>
           </div>
           {insight.usedFallback && <p className="fallback-note">{copy.fallback}</p>}
-          <h5>{copy.observationLabel}</h5>
+          <h4>{copy.observationLabel}</h4>
           <p>{insight.observation}</p>
-          <h5>{copy.hintLabel}</h5>
+          <h4>{copy.hintLabel}</h4>
           <p>{insight.hint}</p>
           <p><b>{copy.whyLabel}:</b> {insight.whyItMatters}</p>
           <p><b>{copy.inspectLabel}:</b> {insight.inspectNext}</p>

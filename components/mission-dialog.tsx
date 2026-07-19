@@ -1,39 +1,30 @@
 "use client";
 
-import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { useLayoutEffect, useRef, type KeyboardEvent } from "react";
 import type { DialogCodeState } from "@/lib/domain/mission";
 import type { MissionDictionary } from "@/lib/i18n/dictionaries";
 
 type MissionDialogProps = {
   codeState: DialogCodeState;
   copy: MissionDictionary["fixture"];
-  openRequest: number;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   onPrimary: () => void;
 };
 
-export function MissionDialog({ codeState, copy, openRequest, onPrimary }: MissionDialogProps) {
-  const [open, setOpen] = useState(false);
+export function MissionDialog({ codeState, copy, open, onOpenChange, onPrimary }: MissionDialogProps) {
   const triggerRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const primaryRef = useRef<HTMLButtonElement>(null);
-  const hasReceivedOpenRequest = useRef(false);
 
-  useEffect(() => {
-    if (!hasReceivedOpenRequest.current) {
-      hasReceivedOpenRequest.current = true;
-      return;
-    }
-    setOpen(true);
-  }, [openRequest]);
-
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!open || !codeState.focusContainment) return;
     closeRef.current?.focus();
   }, [codeState.focusContainment, open]);
 
   const closeDialog = () => {
-    setOpen(false);
+    onOpenChange(false);
     if (codeState.focusRestoration) triggerRef.current?.focus();
   };
 
@@ -91,7 +82,7 @@ export function MissionDialog({ codeState, copy, openRequest, onPrimary }: Missi
           </div>
         )}
       </dl>
-      <button ref={triggerRef} data-action="trigger" className="trigger" type="button" onClick={() => setOpen(true)}>
+      <button ref={triggerRef} data-action="trigger" className="trigger" type="button" onClick={() => onOpenChange(true)}>
         {copy.open}
       </button>
       {open && (

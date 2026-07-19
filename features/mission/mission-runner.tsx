@@ -10,7 +10,7 @@ import { keyboardTrapObjectives, type ObjectiveResult, type ObjectiveStatus, typ
 import { coachMissionId, type CoachInsight } from "@/lib/domain/providers";
 import { dictionaries, statusLabel, type Locale, type MissionDictionary } from "@/lib/i18n/dictionaries";
 import { getLocaleSnapshot, getServerLocaleSnapshot, selectLocale, subscribeToLocale } from "@/lib/i18n/locale";
-import { AllowlistedDialogCodeLab, brokenDialogCode, isFullyRepaired } from "@/lib/mission/code-lab";
+import { AllowlistedDialogCodeLab, brokenDialogCode, isFullyRepaired, type RepairProvider } from "@/lib/mission/code-lab";
 import { DialogObjectiveEvaluator } from "@/lib/mission/evaluator";
 import { captureSnapshotEvidence } from "@/lib/mission/snapshot";
 import {
@@ -25,7 +25,8 @@ import { WebAudioBattleSoundPlayer } from "@/lib/progression/sound";
 type ActiveMissionPhase = Exclude<MissionPhase, "landing" | "briefing" | "debrief">;
 const activeMissionPhases: readonly ActiveMissionPhase[] = ["broken-preview", "attempting", "verifying", "partial-success", "failure", "victory"];
 const isActivePhase = (phase: MissionPhase): phase is ActiveMissionPhase => activeMissionPhases.some((activePhase) => activePhase === phase);
-const codeLab = new AllowlistedDialogCodeLab();
+const repairProvider: RepairProvider = new AllowlistedDialogCodeLab();
+const objectiveEvaluator = new DialogObjectiveEvaluator();
 
 function LanguageSwitcher({ locale, copy, onChange }: { locale: Locale; copy: MissionDictionary; onChange: (locale: Locale) => void }) {
   return (
@@ -107,12 +108,13 @@ export function MissionRunner() {
   const [appliedCode, setAppliedCode] = useState({ ...brokenDialogCode });
   const [validationErrors, setValidationErrors] = useState<readonly string[]>([]);
   const [showDiff, setShowDiff] = useState(false);
-  const [openRequest, setOpenRequest] = useState(0);
+  const [dialogOpen, setDialogOpen] = useState(false);
   const [checking, setChecking] = useState(false);
   const rootRef = useRef<HTMLElement>(null);
   const phaseHeadingRef = useRef<HTMLHeadingElement>(null);
   const codeLabHeadingRef = useRef<HTMLHeadingElement>(null);
   const coachRequestRef = useRef(0);
+  const checkReturnFocusRef = useRef<HTMLElement | null>(null);
   const previousPhaseRef = useRef(state.phase);
   const victoryHeadingRef = useRef<HTMLHeadingElement>(null);
   const progressionStorageRef = useRef<LocalProgressionStorage | null>(null);
@@ -127,15 +129,28 @@ export function MissionRunner() {
 
   useEffect(() => {
     document.documentElement.lang = locale;
-  }, [locale]);
+    document.title = copy.product.workingTitle;
+  }, [copy.product.workingTitle, locale]);
 
   useEffect(() => {
     if (previousPhaseRef.current !== state.phase) {
       if (state.phase === "victory") victoryHeadingRef.current?.focus();
-      else phaseHeadingRef.current?.focus();
+      else if (
+        state.phase === "landing" ||
+        state.phase === "briefing" ||
+        state.phase === "broken-preview" ||
+        state.phase === "debrief"
+      ) phaseHeadingRef.current?.focus();
     }
     previousPhaseRef.current = state.phase;
   }, [state.phase]);
+
+  useEffect(() => {
+    if (checking) return;
+    const returnFocus = checkReturnFocusRef.current;
+    checkReturnFocusRef.current = null;
+    if (state.phase !== "victory" && returnFocus?.isConnected) returnFocus.focus();
+  }, [checking, state.phase]);
 
   useEffect(() => {
     const stored = progressionStorageRef.current?.read();
@@ -164,7 +179,7 @@ export function MissionRunner() {
   }, [state.history.length, state.phase, state.xpEarned]);
 
   const applyChanges = () => {
-    const validation = codeLab.apply(draftCode);
+    const validation = repairProvider.apply(draftCode);
     if (!validation.ok) {
       setValidationErrors(validation.errors.map((error) => copy.codeLab.validationErrors[error]));
       return;
@@ -176,10 +191,12 @@ export function MissionRunner() {
 
   const runChecks = async () => {
     if (!rootRef.current || checking) return;
+    const activeElement = rootRef.current.ownerDocument.activeElement;
+    checkReturnFocusRef.current = activeElement instanceof HTMLElement ? activeElement : null;
     setChecking(true);
     dispatch({ type: "BEGIN_VERIFICATION" });
     try {
-      const objectiveResults = await new DialogObjectiveEvaluator().evaluate(rootRef.current);
+      const objectiveResults = await objectiveEvaluator.evaluate(rootRef.current);
       if (!rootRef.current) return;
       const snapshot = captureSnapshotEvidence({
         root: rootRef.current,
@@ -188,6 +205,8 @@ export function MissionRunner() {
         codeState: appliedCode,
         objectiveResults,
       });
+      await objectiveEvaluator.cleanup(rootRef.current);
+      if (!rootRef.current) return;
       setSelectedAttempt(state.attempt);
       setCoach(null);
       setCoachError(false);
@@ -203,7 +222,7 @@ export function MissionRunner() {
   };
 
   const resetCode = () => {
-    const reset = codeLab.reset();
+    const reset = repairProvider.reset();
     setDraftCode(reset);
     setAppliedCode({ ...reset });
     setValidationErrors([]);
@@ -221,7 +240,7 @@ export function MissionRunner() {
     setAppliedCode({ ...brokenDialogCode });
     setValidationErrors([]);
     setShowDiff(false);
-    setOpenRequest(0);
+    setDialogOpen(false);
     coachRequestRef.current += 1;
     completionRecordedRef.current = false;
   };
@@ -334,6 +353,7 @@ export function MissionRunner() {
             <h1 ref={phaseHeadingRef} tabIndex={-1}>{copy.landing.heading}</h1>
             <p className="proposition">{copy.product.proposition}</p>
             <p className="lead">{copy.landing.body}</p>
+            <p className="runtime-note">{copy.product.runtimeNote}</p>
             <div className="fresh-status" aria-label={copy.mission.status}>
               <span>{copy.mission.hp(state.hp)}</span><span>{copy.mission.objectivesProgress(0)}</span><span>{copy.progression.totalXp(progression.totalXp)}</span>
             </div>
@@ -370,7 +390,13 @@ export function MissionRunner() {
               <ObjectiveList copy={copy} results={state.results} />
             </section>
 
-            <MissionDialog codeState={appliedCode} copy={copy.fixture} openRequest={openRequest} onPrimary={() => undefined} />
+            <MissionDialog
+              codeState={appliedCode}
+              copy={copy.fixture}
+              open={dialogOpen}
+              onOpenChange={setDialogOpen}
+              onPrimary={() => undefined}
+            />
 
             <section className="panel battle" aria-labelledby="battle-heading">
               <h2 id="battle-heading" className="sr-only">{copy.mission.heading}</h2>
@@ -393,13 +419,13 @@ export function MissionRunner() {
           <CodeLabPanel
             copy={copy.codeLab}
             draft={draftCode}
-            source={codeLab.source(draftCode)}
-            diff={codeLab.diff(draftCode)}
+            source={repairProvider.source(draftCode)}
+            diff={repairProvider.diff(draftCode)}
             showDiff={showDiff}
             validationErrors={validationErrors}
             checking={checking}
             onChange={setDraftCode}
-            onTryBrokenUi={() => setOpenRequest((request) => request + 1)}
+            onTryBrokenUi={() => setDialogOpen(true)}
             onApply={applyChanges}
             onRunChecks={runChecks}
             onReset={resetCode}
@@ -408,7 +434,7 @@ export function MissionRunner() {
           />
 
           <section className="panel verification-panel" aria-labelledby="verification-heading">
-            <div className="section-heading-row"><div><h2 id="verification-heading">{copy.console.heading}</h2><p>{copy.console.deterministic}</p></div><span className="attempt-label">#{state.attempt}</span></div>
+            <div className="section-heading-row"><div><h2 id="verification-heading">{copy.console.heading}</h2><p>{copy.console.deterministic}</p></div><span className="attempt-label" aria-label={copy.console.attempt(state.attempt)}>#{state.attempt}</span></div>
             <ul className="event-feed">{state.feed.length === 0 ? <li>{copy.console.empty}</li> : state.feed.map((code, index) => <li key={`${code}-${index}`}>{copy.feed[code]}</li>)}</ul>
             {state.results.length > 0 && <div className="results-summary"><h3>{copy.results.heading}</h3><ObjectiveList copy={copy} results={state.results} detailed /></div>}
             <div className="history-section">

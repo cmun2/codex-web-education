@@ -35,6 +35,7 @@ test("learner iterates through independent failures and defeats the boss only wi
   await expect(page.getByText("Allowlisted DSL")).toBeVisible();
   await expect(page.getByText("Broken Fixture", { exact: true })).toBeVisible();
   await expect(page.getByText("Pending", { exact: true })).toHaveCount(3);
+  await expect(page.getByTestId("mission-dialog")).toHaveCount(0);
 
   await page.getByRole("button", { name: "Try Broken UI" }).click();
   const brokenDialog = page.getByTestId("mission-dialog");
@@ -45,6 +46,8 @@ test("learner iterates through independent failures and defeats the boss only wi
 
   await page.getByRole("button", { name: "Run Checks" }).click();
   await expect(page.getByTestId("boss-hp")).toHaveText("100");
+  await expect(page.getByTestId("mission-dialog")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Run Checks" })).toBeFocused();
   await expect(page.getByRole("button", { name: "Attempt 1 · 0/3" })).toBeVisible();
   await expect(page.getByRole("img", { name: "Fixture-region snapshot for attempt 1" })).toBeVisible();
 
@@ -52,7 +55,9 @@ test("learner iterates through independent failures and defeats the boss only wi
   await page.getByLabel("Use aria-modal").check();
   await page.getByLabel("aria-labelledby").selectOption("dialog-title");
   await page.getByLabel("aria-describedby").selectOption("dialog-description");
-  await page.getByRole("button", { name: "Apply Changes" }).click();
+  const applyChanges = page.getByRole("button", { name: "Apply Changes" });
+  await applyChanges.click();
+  await expect(applyChanges).toBeFocused();
   await expect(page.getByText("Fixture Modified")).toBeVisible();
   await expect(page.getByTestId("boss-hp")).toHaveText("100");
 
@@ -144,6 +149,8 @@ test("switches to Korean, persists the choice, and exposes localized Code Lab ac
   await expect(page.getByRole("button", { name: "고장 난 UI 체험" })).toBeVisible();
   await expect(page.getByRole("button", { name: "변경 사항 적용" })).toBeVisible();
   await expect(page.getByRole("button", { name: "검사 실행" })).toBeVisible();
+  const viewport = await page.evaluate(() => ({ innerWidth: window.innerWidth, scrollWidth: document.documentElement.scrollWidth }));
+  expect(viewport.scrollWidth).toBeLessThanOrEqual(viewport.innerWidth);
   expect(browserErrors).toEqual([]);
 });
 

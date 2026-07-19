@@ -217,8 +217,12 @@ describe("rendered behavior evaluation and snapshot evidence", () => {
 
   it("runs real independent dialog behavior checks", async () => {
     const root = renderFixture({ ...repairedDialogCode, focusContainment: false });
-    const objectives = await new DialogObjectiveEvaluator().evaluate(root);
+    const evaluator = new DialogObjectiveEvaluator();
+    const objectives = await evaluator.evaluate(root);
     expect(objectives.map((objective) => objective.status)).toEqual(["passed", "failed", "passed"]);
+    expect(root.querySelector("[data-testid='mission-dialog']")).not.toBeNull();
+    await evaluator.cleanup(root);
+    expect(root.querySelector("[data-testid='mission-dialog']")).toBeNull();
   });
 
   it("captures only fixture-region evidence with attempt metadata and allowlisted state", () => {

@@ -13,6 +13,14 @@ import { getLocaleSnapshot, getServerLocaleSnapshot, selectLocale, subscribeToLo
 import { AllowlistedDialogCodeLab, brokenDialogCode, isFullyRepaired } from "@/lib/mission/code-lab";
 import { DialogObjectiveEvaluator } from "@/lib/mission/evaluator";
 import { captureSnapshotEvidence } from "@/lib/mission/snapshot";
+import {
+  defaultProgression,
+  keyboardTrapMissionId,
+  LocalProgressionStorage,
+  type SoundChoice,
+  type StoredProgression,
+} from "@/lib/progression/storage";
+import { WebAudioBattleSoundPlayer } from "@/lib/progression/sound";
 
 type ActiveMissionPhase = Exclude<MissionPhase, "landing" | "briefing" | "debrief">;
 const activeMissionPhases: readonly ActiveMissionPhase[] = ["broken-preview", "attempting", "verifying", "partial-success", "failure", "victory"];
@@ -25,6 +33,21 @@ function LanguageSwitcher({ locale, copy, onChange }: { locale: Locale; copy: Mi
       <button type="button" aria-pressed={locale === "ko"} onClick={() => onChange("ko")}>{copy.language.korean}</button>
       <button type="button" aria-pressed={locale === "en"} onClick={() => onChange("en")}>{copy.language.english}</button>
     </div>
+  );
+}
+
+function SoundControl({ choice, copy, onChange }: { choice: SoundChoice; copy: MissionDictionary; onChange: (choice: SoundChoice) => void }) {
+  const muted = choice === "muted";
+  return (
+    <button
+      className="sound-control"
+      type="button"
+      aria-pressed={muted}
+      aria-label={muted ? copy.progression.soundMuted : copy.progression.soundOn}
+      onClick={() => onChange(muted ? "on" : "muted")}
+    >
+      <span aria-hidden="true">{muted ? "🔇" : "🔊"}</span> {muted ? copy.progression.unmute : copy.progression.mute}
+    </button>
   );
 }
 
@@ -91,16 +114,54 @@ export function MissionRunner() {
   const codeLabHeadingRef = useRef<HTMLHeadingElement>(null);
   const coachRequestRef = useRef(0);
   const previousPhaseRef = useRef(state.phase);
+  const victoryHeadingRef = useRef<HTMLHeadingElement>(null);
+  const progressionStorageRef = useRef<LocalProgressionStorage | null>(null);
+  const soundPlayerRef = useRef<WebAudioBattleSoundPlayer | null>(null);
+  const completionRecordedRef = useRef(false);
+  const [progression, setProgression] = useState<StoredProgression>(defaultProgression);
+  const [storageAvailable, setStorageAvailable] = useState(true);
   const copy = dictionaries[locale];
+
+  if (progressionStorageRef.current === null) progressionStorageRef.current = new LocalProgressionStorage();
+  if (soundPlayerRef.current === null) soundPlayerRef.current = new WebAudioBattleSoundPlayer();
 
   useEffect(() => {
     document.documentElement.lang = locale;
   }, [locale]);
 
   useEffect(() => {
-    if (previousPhaseRef.current !== state.phase) phaseHeadingRef.current?.focus();
+    if (previousPhaseRef.current !== state.phase) {
+      if (state.phase === "victory") victoryHeadingRef.current?.focus();
+      else phaseHeadingRef.current?.focus();
+    }
     previousPhaseRef.current = state.phase;
   }, [state.phase]);
+
+  useEffect(() => {
+    const stored = progressionStorageRef.current?.read();
+    if (!stored) return;
+    setProgression(stored.value);
+    setStorageAvailable(stored.storageAvailable);
+  }, []);
+
+  useEffect(() => {
+    if (!state.lastHit || progression.soundChoice === "muted") return;
+    if (state.phase === "victory") soundPlayerRef.current?.playVictory();
+    else soundPlayerRef.current?.playHit();
+  }, [progression.soundChoice, state.lastHit, state.phase]);
+
+  useEffect(() => {
+    if (state.phase !== "victory" || completionRecordedRef.current) return;
+    completionRecordedRef.current = true;
+    const completion = progressionStorageRef.current?.recordCompletion(
+      keyboardTrapMissionId,
+      state.history.length,
+      state.xpEarned,
+    );
+    if (!completion) return;
+    setProgression(completion.value);
+    setStorageAvailable(completion.storageAvailable);
+  }, [state.history.length, state.phase, state.xpEarned]);
 
   const applyChanges = () => {
     const validation = codeLab.apply(draftCode);
@@ -162,6 +223,19 @@ export function MissionRunner() {
     setShowDiff(false);
     setOpenRequest(0);
     coachRequestRef.current += 1;
+    completionRecordedRef.current = false;
+  };
+
+  const replayMission = () => {
+    dispatch({ type: "REPLAY" });
+    resetMissionUi();
+  };
+
+  const updateSound = (choice: SoundChoice) => {
+    const updated = progressionStorageRef.current?.setSoundChoice(choice);
+    if (!updated) return;
+    setProgression(updated.value);
+    setStorageAvailable(updated.storageAvailable);
   };
 
   const selectedVerification: VerificationResult | undefined =
@@ -242,9 +316,16 @@ export function MissionRunner() {
     <main ref={rootRef} className="arena">
       <div className="topbar">
         <p className="working-title">{copy.product.workingTitle}</p>
-        <LanguageSwitcher locale={locale} copy={copy} onChange={selectLocale} />
+        <div className="preferences">
+          <SoundControl choice={progression.soundChoice} copy={copy} onChange={updateSound} />
+          <LanguageSwitcher locale={locale} copy={copy} onChange={selectLocale} />
+        </div>
       </div>
+      {!storageAvailable && <p className="storage-fallback" role="status">{copy.progression.storageFallback}</p>}
       <p className="sr-only" aria-live="polite" aria-atomic="true">{copy.announcements[state.phase]}</p>
+      <p className="sr-only" aria-live="assertive" aria-atomic="true">
+        {state.lastHit ? copy.progression.hitAnnouncement(state.lastHit.damage, state.lastHit.xp, state.lastHit.combo) : ""}
+      </p>
 
       {state.phase === "landing" && (
         <div className="landing-shell">
@@ -254,7 +335,7 @@ export function MissionRunner() {
             <p className="proposition">{copy.product.proposition}</p>
             <p className="lead">{copy.landing.body}</p>
             <div className="fresh-status" aria-label={copy.mission.status}>
-              <span>{copy.mission.hp(state.hp)}</span><span>{copy.mission.objectivesProgress(0)}</span><span>{copy.mission.fixtureStatus(state.fixture)}</span>
+              <span>{copy.mission.hp(state.hp)}</span><span>{copy.mission.objectivesProgress(0)}</span><span>{copy.progression.totalXp(progression.totalXp)}</span>
             </div>
             <button className="primary-action start-action" type="button" onClick={() => dispatch({ type: "START_MISSION" })}>{copy.landing.start}</button>
           </header>
@@ -280,7 +361,7 @@ export function MissionRunner() {
             <p className="compact-proposition">{copy.product.proposition}</p>
           </header>
           <div className="status-strip" aria-label={copy.mission.status}>
-            <span>{copy.mission.hp(state.hp)}</span><span>{copy.mission.objectivesProgress(passedCount)}</span><span>{copy.mission.fixtureStatus(state.fixture)}</span>
+            <span>{copy.mission.hp(state.hp)}</span><span>{copy.mission.objectivesProgress(passedCount)}</span><span>{copy.mission.fixtureStatus(state.fixture)}</span><span>{copy.progression.attempts(state.history.length)}</span><span>{copy.progression.xp(state.xpEarned)}</span><span>{copy.progression.combo(state.combo)}</span>
           </div>
 
           <div className="mission-grid">
@@ -293,7 +374,16 @@ export function MissionRunner() {
 
             <section className="panel battle" aria-labelledby="battle-heading">
               <h2 id="battle-heading" className="sr-only">{copy.mission.heading}</h2>
-              <div className="boss" role="img" aria-label={copy.mission.bossLabel}><span aria-hidden="true">⌘</span><div className="eye left" /><div className="eye right" /><p>{copy.mission.bossLabel}</p></div>
+              <div key={state.lastHit?.attempt ?? 0} className={`boss ${state.lastHit ? "boss-hit" : ""}`} role="img" aria-label={copy.mission.bossLabel}><span aria-hidden="true">⌘</span><div className="eye left" /><div className="eye right" /><p>{copy.mission.bossLabel}</p></div>
+              {state.lastHit && (
+                <div key={`hit-${state.lastHit.attempt}`} className="hit-feedback">
+                  <strong className="damage-number">−{state.lastHit.damage} HP</strong>
+                  <span>{copy.progression.xpGain(state.lastHit.xp)}</span>
+                  <span className="critical-hit">{copy.progression.criticalHit}</span>
+                  {state.lastHit.combo > 1 && <span className="combo-indicator">{copy.progression.combo(state.lastHit.combo)}</span>}
+                  <span className="particles" aria-hidden="true"><i /><i /><i /></span>
+                </div>
+              )}
               <div className="health" aria-hidden="true"><div style={{ width: `${state.hp}%` }} /></div>
               <p className="hp-copy" aria-label={copy.mission.hp(state.hp)}><strong data-testid="boss-hp">{state.hp}</strong> / 100</p>
               <p className="phase" aria-live="polite">{copy.mission.phase[state.phase]}</p>
@@ -346,7 +436,35 @@ export function MissionRunner() {
                 }}
               />
             </div>
-            {state.phase === "victory" && <button className="primary-action" type="button" onClick={() => dispatch({ type: "SHOW_DEBRIEF" })}>{copy.actions.seeDebrief}</button>}
+            {state.phase === "victory" && state.rank && (
+              <section className="victory-summary" aria-labelledby="victory-heading">
+                <p className="victory-kicker">{copy.progression.victory}</p>
+                <h2 id="victory-heading" ref={victoryHeadingRef} tabIndex={-1}>{copy.progression.bossDefeated}</h2>
+                <div className="victory-badges">
+                  <span>{copy.progression.rank(state.rank)}</span>
+                  <span>{copy.progression.xpEarned(state.xpEarned)}</span>
+                  <span>{copy.progression.attempts(state.history.length)}</span>
+                  {state.perfectRepair && <strong>{copy.progression.perfectRepair}</strong>}
+                </div>
+                <h3>{copy.progression.restoredHeading}</h3>
+                <ul>{keyboardTrapObjectives.map((objective) => <li key={objective.id}>✓ {copy.objectives[objective.id].title}</li>)}</ul>
+                <div className="victory-debrief">
+                  <h3>{copy.debrief.heading}</h3>
+                  <p><strong>{copy.debrief.semanticsHeading}:</strong> {copy.debrief.semantics}</p>
+                  <p><strong>{copy.debrief.behaviorHeading}:</strong> {copy.debrief.behavior}</p>
+                </div>
+                <div className="action-row">
+                  <button className="primary-action" type="button" onClick={replayMission}>{copy.actions.replay}</button>
+                  <button className="secondary-action" type="button" onClick={() => dispatch({ type: "SHOW_DEBRIEF" })}>{copy.actions.seeDebrief}</button>
+                </div>
+                <aside className="future-mission" aria-label={copy.progression.teaserLabel}>
+                  <p className="eyebrow">{copy.progression.teaserLabel}</p>
+                  <h3>{copy.progression.teaserTitle}</h3>
+                  <p>{copy.progression.teaserBody}</p>
+                  <span aria-disabled="true">{copy.progression.unavailable}</span>
+                </aside>
+              </section>
+            )}
           </section>
         </>
       )}
@@ -356,7 +474,10 @@ export function MissionRunner() {
           <p className="eyebrow">{copy.debrief.eyebrow}</p><h1 id="debrief-heading" ref={phaseHeadingRef} tabIndex={-1}>{copy.debrief.heading}</h1>
           <div className="debrief-grid"><div><h2>{copy.debrief.semanticsHeading}</h2><p>{copy.debrief.semantics}</p></div><div><h2>{copy.debrief.behaviorHeading}</h2><p>{copy.debrief.behavior}</p></div></div>
           <div className="debrief-score"><span>{copy.mission.hp(state.hp)}</span><span>{copy.mission.objectivesProgress(passedCount)}</span></div>
-          <button className="primary-action" type="button" onClick={() => { dispatch({ type: "REPLAY" }); resetMissionUi(); }}>{copy.actions.replay}</button>
+          <button className="primary-action" type="button" onClick={replayMission}>{copy.actions.replay}</button>
+          <aside className="future-mission" aria-label={copy.progression.teaserLabel}>
+            <p className="eyebrow">{copy.progression.teaserLabel}</p><h2>{copy.progression.teaserTitle}</h2><p>{copy.progression.teaserBody}</p><span aria-disabled="true">{copy.progression.unavailable}</span>
+          </aside>
         </section>
       )}
     </main>

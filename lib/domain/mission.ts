@@ -17,6 +17,7 @@ export type DialogCodeState = {
 export type MissionObjective = {
   id: MissionObjectiveId;
   damage: number;
+  xp: number;
 };
 
 export type CheckCode =
@@ -60,15 +61,20 @@ export type VerificationResult = {
 };
 
 export const keyboardTrapObjectives: readonly MissionObjective[] = [
-  { id: "identity", damage: 30 },
-  { id: "focus", damage: 35 },
-  { id: "keyboard", damage: 35 },
+  { id: "identity", damage: 30, xp: 100 },
+  { id: "focus", damage: 35, xp: 100 },
+  { id: "keyboard", damage: 35, xp: 100 },
 ];
 
 export const damageForObjectives = (objectiveIds: readonly MissionObjectiveId[]): number =>
   keyboardTrapObjectives
     .filter((objective) => objectiveIds.includes(objective.id))
     .reduce((sum, objective) => sum + objective.damage, 0);
+
+export const xpForObjectives = (objectiveIds: readonly MissionObjectiveId[]): number =>
+  keyboardTrapObjectives
+    .filter((objective) => objectiveIds.includes(objective.id))
+    .reduce((sum, objective) => sum + objective.xp, 0);
 
 export const bossHealthForVerifiedObjectives = (objectiveIds: readonly MissionObjectiveId[]): number =>
   Math.max(0, 100 - damageForObjectives(objectiveIds));

@@ -10,7 +10,15 @@ import { keyboardTrapObjectives, type ObjectiveResult, type ObjectiveStatus, typ
 import { coachMissionId, type CoachInsight } from "@/lib/domain/providers";
 import { dictionaries, statusLabel, type Locale, type MissionDictionary } from "@/lib/i18n/dictionaries";
 import { getLocaleSnapshot, getServerLocaleSnapshot, selectLocale, subscribeToLocale } from "@/lib/i18n/locale";
-import { AllowlistedDialogCodeLab, brokenDialogCode, isFullyRepaired, type RepairProvider } from "@/lib/mission/code-lab";
+import {
+  AllowlistedDialogCodeLab,
+  brokenDialogCode,
+  dialogPreset,
+  dialogPresets,
+  isFullyRepaired,
+  type DialogPresetId,
+  type RepairProvider,
+} from "@/lib/mission/code-lab";
 import { DialogObjectiveEvaluator } from "@/lib/mission/evaluator";
 import { captureSnapshotEvidence } from "@/lib/mission/snapshot";
 import {
@@ -22,7 +30,7 @@ import {
 } from "@/lib/progression/storage";
 import { WebAudioBattleSoundPlayer } from "@/lib/progression/sound";
 
-type ActiveMissionPhase = Exclude<MissionPhase, "landing" | "briefing" | "debrief">;
+type ActiveMissionPhase = Exclude<MissionPhase, "landing" | "debrief">;
 const activeMissionPhases: readonly ActiveMissionPhase[] = ["broken-preview", "attempting", "verifying", "partial-success", "failure", "victory"];
 const isActivePhase = (phase: MissionPhase): phase is ActiveMissionPhase => activeMissionPhases.some((activePhase) => activePhase === phase);
 const repairProvider: RepairProvider = new AllowlistedDialogCodeLab();
@@ -104,8 +112,8 @@ export function MissionRunner() {
   const [coachLoading, setCoachLoading] = useState(false);
   const [coachedAttempt, setCoachedAttempt] = useState<number | null>(null);
   const [selectedAttempt, setSelectedAttempt] = useState<number | null>(null);
-  const [draftCode, setDraftCode] = useState({ ...brokenDialogCode });
-  const [appliedCode, setAppliedCode] = useState({ ...brokenDialogCode });
+  const [codeState, setCodeState] = useState({ ...brokenDialogCode });
+  const [presetId, setPresetId] = useState<DialogPresetId>("everything-missing");
   const [validationErrors, setValidationErrors] = useState<readonly string[]>([]);
   const [showDiff, setShowDiff] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -137,7 +145,6 @@ export function MissionRunner() {
       if (state.phase === "victory") victoryHeadingRef.current?.focus();
       else if (
         state.phase === "landing" ||
-        state.phase === "briefing" ||
         state.phase === "broken-preview" ||
         state.phase === "debrief"
       ) phaseHeadingRef.current?.focus();
@@ -178,14 +185,14 @@ export function MissionRunner() {
     setStorageAvailable(completion.storageAvailable);
   }, [state.history.length, state.phase, state.xpEarned]);
 
-  const applyChanges = () => {
-    const validation = repairProvider.apply(draftCode);
+  const updateCode = (nextCode: typeof codeState) => {
+    const validation = repairProvider.apply(nextCode);
     if (!validation.ok) {
       setValidationErrors(validation.errors.map((error) => copy.codeLab.validationErrors[error]));
       return;
     }
     setValidationErrors([]);
-    setAppliedCode(validation.value);
+    setCodeState(validation.value);
     dispatch({ type: "CHANGES_APPLIED", fixture: isFullyRepaired(validation.value) ? "repaired" : "modified" });
   };
 
@@ -202,7 +209,7 @@ export function MissionRunner() {
         root: rootRef.current,
         attemptNumber: state.attempt,
         locale,
-        codeState: appliedCode,
+        codeState,
         objectiveResults,
       });
       await objectiveEvaluator.cleanup(rootRef.current);
@@ -214,7 +221,7 @@ export function MissionRunner() {
       setCoachLoading(false);
       dispatch({
         type: "RESULTS",
-        result: { attempt: { number: state.attempt, codeState: { ...appliedCode } }, objectives: objectiveResults, snapshot },
+        result: { attempt: { number: state.attempt, codeState: { ...codeState } }, objectives: objectiveResults, snapshot },
       });
     } finally {
       setChecking(false);
@@ -222,12 +229,29 @@ export function MissionRunner() {
   };
 
   const resetCode = () => {
-    const reset = repairProvider.reset();
-    setDraftCode(reset);
-    setAppliedCode({ ...reset });
+    const reset = dialogPreset(presetId);
+    setCodeState(reset);
     setValidationErrors([]);
     setShowDiff(false);
-    dispatch({ type: "CODE_RESET" });
+    dispatch({ type: "CODE_RESET", fixture: presetId === "everything-missing" ? "broken" : "modified" });
+  };
+
+  const loadNextPreset = () => {
+    const currentIndex = dialogPresets.findIndex((preset) => preset.id === presetId);
+    const nextPreset = dialogPresets[(currentIndex + 1) % dialogPresets.length];
+    setPresetId(nextPreset.id);
+    setCodeState(dialogPreset(nextPreset.id));
+    setValidationErrors([]);
+    setShowDiff(false);
+    setDialogOpen(false);
+    setCoach(null);
+    setCoachError(false);
+    setCoachLoading(false);
+    setCoachedAttempt(null);
+    setSelectedAttempt(null);
+    coachRequestRef.current += 1;
+    completionRecordedRef.current = false;
+    dispatch({ type: "NEW_BROKEN_SETUP", fixture: nextPreset.id === "everything-missing" ? "broken" : "modified" });
   };
 
   const resetMissionUi = () => {
@@ -236,8 +260,8 @@ export function MissionRunner() {
     setCoachLoading(false);
     setCoachedAttempt(null);
     setSelectedAttempt(null);
-    setDraftCode({ ...brokenDialogCode });
-    setAppliedCode({ ...brokenDialogCode });
+    setCodeState({ ...brokenDialogCode });
+    setPresetId("everything-missing");
     setValidationErrors([]);
     setShowDiff(false);
     setDialogOpen(false);
@@ -353,7 +377,6 @@ export function MissionRunner() {
             <h1 ref={phaseHeadingRef} tabIndex={-1}>{copy.landing.heading}</h1>
             <p className="proposition">{copy.product.proposition}</p>
             <p className="lead">{copy.landing.body}</p>
-            <p className="runtime-note">{copy.product.runtimeNote}</p>
             <div className="fresh-status" aria-label={copy.mission.status}>
               <span>{copy.mission.hp(state.hp)}</span><span>{copy.mission.objectivesProgress(0)}</span><span>{copy.progression.totalXp(progression.totalXp)}</span>
             </div>
@@ -361,17 +384,6 @@ export function MissionRunner() {
           </header>
           <MissionLoop copy={copy} />
         </div>
-      )}
-
-      {state.phase === "briefing" && (
-        <section className="briefing-screen" aria-labelledby="briefing-heading">
-          <p className="eyebrow">{copy.briefing.eyebrow}</p>
-          <h1 id="briefing-heading" ref={phaseHeadingRef} tabIndex={-1}>{copy.briefing.heading}</h1>
-          <p className="lead">{copy.briefing.body}</p>
-          <h2>{copy.briefing.objectivesHeading}</h2>
-          <ObjectiveList copy={copy} results={state.results} detailed />
-          <button className="primary-action" type="button" onClick={() => dispatch({ type: "ENTER_PREVIEW" })}>{copy.briefing.enter}</button>
-        </section>
       )}
 
       {isActivePhase(state.phase) && (
@@ -384,61 +396,70 @@ export function MissionRunner() {
             <span>{copy.mission.hp(state.hp)}</span><span>{copy.mission.objectivesProgress(passedCount)}</span><span>{copy.mission.fixtureStatus(state.fixture)}</span><span>{copy.progression.attempts(state.history.length)}</span><span>{copy.progression.xp(state.xpEarned)}</span><span>{copy.progression.combo(state.combo)}</span>
           </div>
 
-          <div className="mission-grid">
-            <section className="panel objectives-panel" aria-labelledby="objectives-heading">
-              <h2 id="objectives-heading">{copy.briefing.objectivesHeading}</h2>
-              <ObjectiveList copy={copy} results={state.results} />
-            </section>
-
-            <MissionDialog
-              codeState={appliedCode}
-              copy={copy.fixture}
-              open={dialogOpen}
-              onOpenChange={setDialogOpen}
-              onPrimary={() => undefined}
-            />
-
-            <section className="panel battle" aria-labelledby="battle-heading">
-              <h2 id="battle-heading" className="sr-only">{copy.mission.heading}</h2>
-              <div key={state.lastHit?.attempt ?? 0} className={`boss ${state.lastHit ? "boss-hit" : ""}`} role="img" aria-label={copy.mission.bossLabel}><span aria-hidden="true">⌘</span><div className="eye left" /><div className="eye right" /><p>{copy.mission.bossLabel}</p></div>
-              {state.lastHit && (
-                <div key={`hit-${state.lastHit.attempt}`} className="hit-feedback">
-                  <strong className="damage-number">−{state.lastHit.damage} HP</strong>
-                  <span>{copy.progression.xpGain(state.lastHit.xp)}</span>
-                  <span className="critical-hit">{copy.progression.criticalHit}</span>
-                  {state.lastHit.combo > 1 && <span className="combo-indicator">{copy.progression.combo(state.lastHit.combo)}</span>}
-                  <span className="particles" aria-hidden="true"><i /><i /><i /></span>
+          <div className="direct-workspace">
+            <div className="fixture-stage">
+              <MissionDialog codeState={codeState} copy={copy.fixture} open={dialogOpen} onOpenChange={setDialogOpen} onPrimary={() => undefined} />
+              <section className="battle battle-perched" aria-labelledby="battle-heading">
+                <h2 id="battle-heading" className="sr-only">{copy.mission.heading}</h2>
+                <div key={state.lastHit?.attempt ?? 0} className={`boss ${state.lastHit ? "boss-hit" : ""}`} role="img" aria-label={copy.mission.bossLabel}><span aria-hidden="true">⌘</span><div className="eye left" /><div className="eye right" /><p>{copy.mission.bossLabel}</p></div>
+                <div className="boss-meter">
+                  <div className="health" aria-hidden="true"><div style={{ width: `${state.hp}%` }} /></div>
+                  <p className="hp-copy" aria-label={copy.mission.hp(state.hp)}><strong data-testid="boss-hp">{state.hp}</strong> / 100</p>
                 </div>
-              )}
-              <div className="health" aria-hidden="true"><div style={{ width: `${state.hp}%` }} /></div>
-              <p className="hp-copy" aria-label={copy.mission.hp(state.hp)}><strong data-testid="boss-hp">{state.hp}</strong> / 100</p>
-              <p className="phase" aria-live="polite">{copy.mission.phase[state.phase]}</p>
-            </section>
+                <p className="phase" aria-live="polite">
+                  {state.lastHit ? `${copy.progression.hitAnnouncement(state.lastHit.damage, state.lastHit.xp, state.lastHit.combo)} ${copy.mission.phase[state.phase]}` : copy.mission.phase[state.phase]}
+                </p>
+                {state.lastHit && <div key={`hit-${state.lastHit.attempt}`} className="hit-feedback" aria-hidden="true"><strong className="damage-number">−{state.lastHit.damage} HP</strong><span>{copy.progression.xpGain(state.lastHit.xp)}</span></div>}
+              </section>
+            </div>
+
+            <div className="repair-side">
+              <CodeLabPanel
+                copy={copy.codeLab}
+                value={codeState}
+                presetId={presetId}
+                source={repairProvider.source(codeState)}
+                diff={repairProvider.diff(codeState)}
+                showDiff={showDiff}
+                validationErrors={validationErrors}
+                checking={checking}
+                onChange={updateCode}
+                onNewSetup={loadNextPreset}
+                onRunChecks={runChecks}
+                onReset={resetCode}
+                onToggleDiff={() => setShowDiff((visible) => !visible)}
+                headingRef={codeLabHeadingRef}
+              />
+              <section className="panel objectives-panel" aria-labelledby="objectives-heading">
+                <h2 id="objectives-heading">{copy.briefing.objectivesHeading}</h2>
+                <ObjectiveList copy={copy} results={state.results} />
+                {selectedVerification?.objectives.some((result) => result.status === "failed") && (
+                  <VisualCoach
+                    copy={copy.coach}
+                    insight={coach}
+                    loading={coachLoading}
+                    error={coachError}
+                    canAsk
+                    hintAlreadyRevealed={coachedAttempt === selectedVerification.attempt.number}
+                    onAsk={askCoach}
+                    onReturnToCodeLab={() => {
+                      const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+                      codeLabHeadingRef.current?.scrollIntoView({ block: "start", behavior: reducedMotion ? "auto" : "smooth" });
+                      codeLabHeadingRef.current?.focus();
+                    }}
+                  />
+                )}
+              </section>
+            </div>
           </div>
 
-          <CodeLabPanel
-            copy={copy.codeLab}
-            draft={draftCode}
-            source={repairProvider.source(draftCode)}
-            diff={repairProvider.diff(draftCode)}
-            showDiff={showDiff}
-            validationErrors={validationErrors}
-            checking={checking}
-            onChange={setDraftCode}
-            onTryBrokenUi={() => setDialogOpen(true)}
-            onApply={applyChanges}
-            onRunChecks={runChecks}
-            onReset={resetCode}
-            onToggleDiff={() => setShowDiff((visible) => !visible)}
-            headingRef={codeLabHeadingRef}
-          />
-
           <section className="panel verification-panel" aria-labelledby="verification-heading">
-            <div className="section-heading-row"><div><h2 id="verification-heading">{copy.console.heading}</h2><p>{copy.console.deterministic}</p></div><span className="attempt-label" aria-label={copy.console.attempt(state.attempt)}>#{state.attempt}</span></div>
+            <div className="section-heading-row"><div><h2 id="verification-heading">{copy.console.heading}</h2></div><span className="attempt-label" aria-label={copy.console.attempt(state.attempt)}>#{state.attempt}</span></div>
             <ul className="event-feed">{state.feed.length === 0 ? <li>{copy.console.empty}</li> : state.feed.map((code, index) => <li key={`${code}-${index}`}>{copy.feed[code]}</li>)}</ul>
-            {state.results.length > 0 && <div className="results-summary"><h3>{copy.results.heading}</h3><ObjectiveList copy={copy} results={state.results} detailed /></div>}
-            <div className="history-section">
-              <h3>{copy.history.heading}</h3>
+            <details className="history-section">
+              <summary>{copy.history.heading}</summary>
+              <p className="technical-note">{copy.console.deterministic}</p>
+              {state.results.length > 0 && <div className="results-summary"><h3>{copy.results.heading}</h3><ObjectiveList copy={copy} results={state.results} detailed /></div>}
               <AttemptHistory history={state.history} copy={copy.history} selectedAttempt={selectedAttempt} onSelectAttempt={(attempt) => {
                 setSelectedAttempt(attempt);
                 setCoach(null);
@@ -447,21 +468,7 @@ export function MissionRunner() {
                 coachRequestRef.current += 1;
                 setCoachLoading(false);
               }} />
-              <VisualCoach
-                copy={copy.coach}
-                insight={coach}
-                loading={coachLoading}
-                error={coachError}
-                canAsk={Boolean(selectedVerification?.objectives.some((result) => result.status === "failed"))}
-                hintAlreadyRevealed={coachedAttempt === selectedVerification?.attempt.number}
-                onAsk={askCoach}
-                onReturnToCodeLab={() => {
-                  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-                  codeLabHeadingRef.current?.scrollIntoView({ block: "start", behavior: reducedMotion ? "auto" : "smooth" });
-                  codeLabHeadingRef.current?.focus();
-                }}
-              />
-            </div>
+            </details>
             {state.phase === "victory" && state.rank && (
               <section className="victory-summary" aria-labelledby="victory-heading">
                 <p className="victory-kicker">{copy.progression.victory}</p>

@@ -20,6 +20,38 @@ export const repairedDialogCode: DialogCodeState = {
   focusRestoration: true,
 };
 
+export type DialogPresetId = "everything-missing" | "unnamed-modal" | "keyboard-trap";
+
+export type DialogPreset = {
+  id: DialogPresetId;
+  code: DialogCodeState;
+};
+
+export const dialogPresets: readonly DialogPreset[] = [
+  { id: "everything-missing", code: brokenDialogCode },
+  {
+    id: "unnamed-modal",
+    code: {
+      ...repairedDialogCode,
+      ariaLabelledBy: "none",
+      ariaDescribedBy: "none",
+    },
+  },
+  {
+    id: "keyboard-trap",
+    code: {
+      ...repairedDialogCode,
+      escapeCloses: false,
+      focusRestoration: false,
+    },
+  },
+] as const;
+
+export const dialogPreset = (id: DialogPresetId): DialogCodeState => {
+  const preset = dialogPresets.find((candidate) => candidate.id === id) ?? dialogPresets[0];
+  return { ...preset.code };
+};
+
 const fieldNames = [
   "dialogRole",
   "ariaModal",
@@ -101,7 +133,7 @@ export function validateDialogCodeState(input: unknown): CodeLabValidation {
 export type CodeDiffLine = { kind: "same" | "added" | "removed"; text: string };
 
 const sourceLines = (state: DialogCodeState): string[] => [
-  "function SafeguardDialog() {",
+  "function DeleteAddressDialog() {",
   `  const escapeCloses = ${String(state.escapeCloses)};`,
   `  const containFocus = ${String(state.focusContainment)};`,
   `  const restoreFocus = ${String(state.focusRestoration)};`,

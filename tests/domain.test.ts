@@ -14,6 +14,7 @@ import { coachMissionId, DeterministicCoachProvider } from "@/lib/domain/provide
 import {
   AllowlistedDialogCodeLab,
   brokenDialogCode,
+  dialogPresets,
   diffDialogCode,
   repairedDialogCode,
   validateDialogCodeState,
@@ -86,6 +87,13 @@ describe("allowlisted Code Lab", () => {
     expect(diff.some((line) => line.kind === "added" && line.text.includes('role="dialog"'))).toBe(true);
     expect(new AllowlistedDialogCodeLab().reset()).toEqual(brokenDialogCode);
   });
+
+  it("keeps every curated broken setup inside the typed allowlist", () => {
+    expect(dialogPresets.map((preset) => preset.id)).toEqual(["everything-missing", "unnamed-modal", "keyboard-trap"]);
+    for (const preset of dialogPresets) {
+      expect(validateDialogCodeState(preset.code)).toEqual({ ok: true, value: preset.code });
+    }
+  });
 });
 
 describe("battle domain", () => {
@@ -108,6 +116,13 @@ describe("battle domain", () => {
     expect(next.hp).toBe(35);
     expect(next.verifiedObjectiveIds).toEqual(["identity", "focus"]);
     expect(next).toMatchObject({ xpEarned: 200, combo: 1 });
+  });
+
+  it("clears verification rewards when a new broken setup is loaded", () => {
+    const passed = objectiveIds.map((id) => result(id, true));
+    const won = battleReducer(initialBattleState, { type: "RESULTS", result: verification(1, passed) });
+    const reset = battleReducer(won, { type: "NEW_BROKEN_SETUP", fixture: "modified" });
+    expect(reset).toMatchObject({ phase: "broken-preview", hp: 100, verifiedObjectiveIds: [], history: [], xpEarned: 0, lastHit: null });
   });
 
   it("builds a consecutive-pass combo, counts attempts, ranks victory, and awards Perfect Repair truthfully", () => {

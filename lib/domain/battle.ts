@@ -10,7 +10,6 @@ import {
 
 export type MissionPhase =
   | "landing"
-  | "briefing"
   | "broken-preview"
   | "attempting"
   | "verifying"
@@ -55,9 +54,9 @@ export type BattleState = {
 
 export type BattleAction =
   | { type: "START_MISSION" }
-  | { type: "ENTER_PREVIEW" }
   | { type: "CHANGES_APPLIED"; fixture: Exclude<FixtureStatus, "broken"> }
-  | { type: "CODE_RESET" }
+  | { type: "NEW_BROKEN_SETUP"; fixture: FixtureStatus }
+  | { type: "CODE_RESET"; fixture: FixtureStatus }
   | { type: "BEGIN_VERIFICATION" }
   | { type: "RESULTS"; result: VerificationResult }
   | { type: "SHOW_DEBRIEF" }
@@ -107,13 +106,13 @@ export const rankForAttempts = (attempts: number): MissionRank => {
 export function battleReducer(state: BattleState, action: BattleAction): BattleState {
   switch (action.type) {
     case "START_MISSION":
-      return { ...state, phase: "briefing" };
-    case "ENTER_PREVIEW":
       return { ...state, phase: "broken-preview", feed: ["entered-preview"] };
     case "CHANGES_APPLIED":
       return { ...state, phase: "attempting", fixture: action.fixture, lastHit: null, feed: [...state.feed, "changes-applied"] };
     case "CODE_RESET":
-      return { ...state, phase: "broken-preview", fixture: "broken", feed: [...state.feed, "code-reset"] };
+      return { ...state, phase: "broken-preview", fixture: action.fixture, feed: [...state.feed, "code-reset"] };
+    case "NEW_BROKEN_SETUP":
+      return { ...initialBattleState, phase: "broken-preview", fixture: action.fixture, feed: ["entered-preview"] };
     case "BEGIN_VERIFICATION":
       return { ...state, phase: "verifying", lastHit: null, feed: [...state.feed, "verification-started"] };
     case "RESULTS": {

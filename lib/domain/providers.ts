@@ -237,7 +237,7 @@ const copyFor = (
     keyboard: [
       { observation: "The keyboard objective failed, so the visible close controls do not yet provide the complete keyboard exit path.", hint: "Make Escape close the dialog.", whyItMatters: "A standard keyboard dismissal gives users a fast, expected way out.", inspectNext: "Inspect the Escape-close control.", bossTaunt: "No Escape? Then you stay with me!" },
       { observation: "The dialog can close, but the attempt still fails the return-path contract.", hint: "Restore focus to the button that opened the dialog.", whyItMatters: "Returning focus lets keyboard users continue from the exact place they left.", inspectNext: "Inspect focus after closing with Escape.", bossTaunt: "Close the trap and I will still steal your place!" },
-      { observation: "The selected attempt still lacks the full keyboard close-and-return behavior.", hint: "Enable both Escape dismissal and focus restoration, then verify the opener is focused.", whyItMatters: "Dismissal and restoration are one continuous keyboard interaction.", inspectNext: "Open, press Escape, and check the Open safeguards button for focus.", bossTaunt: "Two steps make the exit—miss either and I win!" },
+      { observation: "The selected attempt still lacks the full keyboard close-and-return behavior.", hint: "Enable both Escape dismissal and focus restoration, then verify the opener is focused.", whyItMatters: "Dismissal and restoration are one continuous keyboard interaction.", inspectNext: "Open, press Escape, and check the Delete address button for focus.", bossTaunt: "Two steps make the exit—miss either and I win!" },
     ],
   };
   if (locale === "en") return english[objectiveId][level - 1];
@@ -256,7 +256,7 @@ const copyFor = (
     keyboard: [
       { observation: "키보드 목표가 실패해 보이는 닫기 컨트롤만으로는 완전한 키보드 탈출 경로가 없습니다.", hint: "Escape로 대화상자가 닫히게 하세요.", whyItMatters: "표준 키보드 닫기는 빠르고 예상 가능한 탈출 방법입니다.", inspectNext: "Escape 닫기 제어 값을 확인하세요.", bossTaunt: "Escape가 없으면 나와 계속 있어야지!" },
       { observation: "대화상자가 닫혀도 이번 시도는 복귀 경로 계약을 통과하지 못했습니다.", hint: "대화상자를 연 버튼으로 포커스를 되돌리세요.", whyItMatters: "포커스 복귀는 키보드 사용자가 중단한 정확한 위치에서 계속하게 합니다.", inspectNext: "Escape로 닫은 뒤 포커스를 확인하세요.", bossTaunt: "함정을 닫아도 네 자리는 내가 훔친다!" },
-      { observation: "선택한 시도에 완전한 키보드 닫기와 복귀 동작이 아직 없습니다.", hint: "Escape 닫기와 포커스 복귀를 모두 켜고 열기 버튼에 포커스가 오는지 검증하세요.", whyItMatters: "닫기와 복귀는 하나의 연속된 키보드 상호작용입니다.", inspectNext: "열고 Escape를 누른 뒤 보호 설정 열기 버튼의 포커스를 확인하세요.", bossTaunt: "탈출은 두 단계야. 하나라도 놓치면 내가 이긴다!" },
+      { observation: "선택한 시도에 완전한 키보드 닫기와 복귀 동작이 아직 없습니다.", hint: "Escape 닫기와 포커스 복귀를 모두 켜고 열기 버튼에 포커스가 오는지 검증하세요.", whyItMatters: "닫기와 복귀는 하나의 연속된 키보드 상호작용입니다.", inspectNext: "열고 Escape를 누른 뒤 배송지 삭제 버튼의 포커스를 확인하세요.", bossTaunt: "탈출은 두 단계야. 하나라도 놓치면 내가 이긴다!" },
     ],
   };
   return korean[objectiveId][level - 1];

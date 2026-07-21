@@ -1,19 +1,167 @@
-import { bossHealth, missionComplete, ObjectiveResult } from "@/lib/domain/mission";
+import {
+  bossHealthForVerifiedObjectives,
+  damageForObjectives,
+  keyboardTrapObjectives,
+  missionComplete,
+  xpForObjectives,
+  type MissionObjectiveId,
+  type MissionObjective,
+  type ObjectiveResult,
+  type VerificationResult,
+} from "@/lib/domain/mission";
 
-export type BattlePhase = "idle" | "inspecting" | "repairing" | "evaluating" | "damaged" | "victory";
-export type BattleState = { phase: BattlePhase; results: ObjectiveResult[]; hp: number; repaired: boolean; attempt: number; feed: string[] };
+export type MissionPhase =
+  | "landing"
+  | "broken-preview"
+  | "attempting"
+  | "verifying"
+  | "partial-success"
+  | "failure"
+  | "victory"
+  | "debrief";
+export type FixtureStatus = "broken" | "modified" | "repaired";
+export type MissionRank = "S" | "A" | "B" | "C";
+export type BattleHit = {
+  attempt: number;
+  objectiveIds: MissionObjectiveId[];
+  damage: number;
+  xp: number;
+  combo: number;
+  accessibilityCriticalHit: true;
+};
+export type FeedCode =
+  | "entered-preview"
+  | "changes-applied"
+  | "code-reset"
+  | "verification-started"
+  | "verification-failed"
+  | "verification-partial"
+  | "verification-passed";
+
+export type BattleState = {
+  phase: MissionPhase;
+  results: ObjectiveResult[];
+  verifiedObjectiveIds: MissionObjectiveId[];
+  hp: number;
+  fixture: FixtureStatus;
+  attempt: number;
+  history: VerificationResult[];
+  feed: FeedCode[];
+  xpEarned: number;
+  combo: number;
+  lastHit: BattleHit | null;
+  rank: MissionRank | null;
+  perfectRepair: boolean;
+  objectives: readonly MissionObjective[];
+};
+
 export type BattleAction =
-  | { type: "START" }
-  | { type: "REPAIRED" }
-  | { type: "RESULTS"; results: ObjectiveResult[] }
-  | { type: "RESET" };
+  | { type: "START_MISSION" }
+  | { type: "CHANGES_APPLIED"; fixture: Exclude<FixtureStatus, "broken"> }
+  | { type: "NEW_BROKEN_SETUP"; fixture: FixtureStatus; objectives?: readonly MissionObjective[] }
+  | { type: "CODE_RESET"; fixture: FixtureStatus }
+  | { type: "BEGIN_VERIFICATION" }
+  | { type: "RESULTS"; result: VerificationResult }
+  | { type: "SHOW_DEBRIEF" }
+  | { type: "REPLAY"; objectives?: readonly MissionObjective[] };
 
-export const initialBattleState: BattleState = { phase: "idle", results: [], hp: 100, repaired: false, attempt: 0, feed: ["Broken fixture loaded. Browser objectives are waiting."] };
+export const initialBattleState: BattleState = {
+  phase: "landing",
+  results: [],
+  verifiedObjectiveIds: [],
+  hp: 100,
+  fixture: "broken",
+  attempt: 1,
+  history: [],
+  feed: [],
+  xpEarned: 0,
+  combo: 0,
+  lastHit: null,
+  rank: null,
+  perfectRepair: false,
+  objectives: keyboardTrapObjectives,
+};
+
+const addNewlyPassed = (
+  verified: readonly MissionObjectiveId[],
+  results: readonly ObjectiveResult[],
+): MissionObjectiveId[] => {
+  const updated = [...verified];
+  for (const result of results) {
+    if (result.status === "passed" && !updated.includes(result.objectiveId)) updated.push(result.objectiveId);
+  }
+  return updated;
+};
+
+const newlyPassed = (
+  verified: readonly MissionObjectiveId[],
+  results: readonly ObjectiveResult[],
+): MissionObjectiveId[] => results
+  .filter((result) => result.status === "passed" && !verified.includes(result.objectiveId))
+  .map((result) => result.objectiveId);
+
+export const rankForAttempts = (attempts: number): MissionRank => {
+  if (attempts <= 1) return "S";
+  if (attempts === 2) return "A";
+  if (attempts === 3) return "B";
+  return "C";
+};
 
 export function battleReducer(state: BattleState, action: BattleAction): BattleState {
-  if (action.type === "RESET") return { ...initialBattleState, attempt: state.attempt + 1 };
-  if (action.type === "START") return { ...state, phase: "inspecting", feed: [...state.feed, "Inspecting dialog semantics and keyboard paths…", "Applying deterministic demo repair…"] };
-  if (action.type === "REPAIRED") return { ...state, phase: "evaluating", repaired: true, feed: [...state.feed, "Repaired fixture mounted. Verifying user behavior…"] };
-  const hp = bossHealth(action.results);
-  return { ...state, results: action.results, hp, phase: missionComplete(action.results) ? "victory" : "damaged", feed: [...state.feed, ...action.results.map((result) => `${result.objectiveId}: ${result.status}`), missionComplete(action.results) ? "Acceptance checks complete. Keyboard Trap Boss defeated." : "Some browser objectives still fail."] };
+  switch (action.type) {
+    case "START_MISSION":
+      return { ...state, phase: "broken-preview", feed: ["entered-preview"] };
+    case "CHANGES_APPLIED":
+      return { ...state, phase: "attempting", fixture: action.fixture, lastHit: null, feed: [...state.feed, "changes-applied"] };
+    case "CODE_RESET":
+      return { ...state, phase: "broken-preview", fixture: action.fixture, feed: [...state.feed, "code-reset"] };
+    case "NEW_BROKEN_SETUP":
+      return { ...initialBattleState, phase: "broken-preview", fixture: action.fixture, objectives: action.objectives ?? state.objectives, feed: ["entered-preview"] };
+    case "BEGIN_VERIFICATION":
+      return { ...state, phase: "verifying", lastHit: null, feed: [...state.feed, "verification-started"] };
+    case "RESULTS": {
+      const newlyPassedObjectiveIds = newlyPassed(state.verifiedObjectiveIds, action.result.objectives);
+      const verifiedObjectiveIds = addNewlyPassed(state.verifiedObjectiveIds, action.result.objectives);
+      const won = missionComplete(verifiedObjectiveIds, state.objectives);
+      const anyPassed = verifiedObjectiveIds.length > 0;
+      const phase: MissionPhase = won ? "victory" : anyPassed ? "partial-success" : "failure";
+      const outcome: FeedCode = won
+        ? "verification-passed"
+        : anyPassed
+          ? "verification-partial"
+          : "verification-failed";
+      const damage = damageForObjectives(newlyPassedObjectiveIds, state.objectives);
+      const xp = xpForObjectives(newlyPassedObjectiveIds, state.objectives);
+      const combo = newlyPassedObjectiveIds.length > 0 ? state.combo + newlyPassedObjectiveIds.length : 0;
+      const attempts = state.history.length + 1;
+      return {
+        ...state,
+        results: action.result.objectives,
+        verifiedObjectiveIds,
+        hp: bossHealthForVerifiedObjectives(verifiedObjectiveIds, state.objectives),
+        phase,
+        attempt: state.attempt + 1,
+        history: [...state.history, action.result],
+        feed: [...state.feed, outcome],
+        xpEarned: state.xpEarned + xp,
+        combo,
+        lastHit: newlyPassedObjectiveIds.length > 0
+          ? {
+              attempt: action.result.attempt.number,
+              objectiveIds: newlyPassedObjectiveIds,
+              damage,
+              xp,
+              combo,
+              accessibilityCriticalHit: true,
+            }
+          : null,
+        rank: won ? rankForAttempts(attempts) : null,
+        perfectRepair: won && attempts === 1,
+      };
+    }
+    case "SHOW_DEBRIEF":
+      return state.phase === "victory" ? { ...state, phase: "debrief" } : state;
+    case "REPLAY":
+      return { ...initialBattleState, objectives: action.objectives ?? state.objectives };
+  }
 }

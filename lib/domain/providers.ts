@@ -68,7 +68,7 @@ export type CoachOutputValidation =
   | { ok: true; value: CoachStructuredOutput }
   | { ok: false };
 
-const objectiveIds: readonly MissionObjectiveId[] = ["identity", "focus", "keyboard"];
+const objectiveIds: readonly MissionObjectiveId[] = ["identity", "focus", "keyboard", "layout"];
 const inputFields = [
   "missionId",
   "failedObjectiveIds",
@@ -169,7 +169,7 @@ export function validateCoachInput(input: unknown): CoachInputValidation {
   for (let index = 0; index < failedObjectiveIds.length; index += 1) {
     const id = read(failedObjectiveIds, String(index));
     if (
-      (id !== "identity" && id !== "focus" && id !== "keyboard") ||
+      (id !== "identity" && id !== "focus" && id !== "keyboard" && id !== "layout") ||
       requestedObjectives.some((objectiveId) => objectiveId === id)
     ) return { ok: false, error: "INVALID_OBJECTIVES" };
     requestedObjectives.push(id);
@@ -239,6 +239,11 @@ const copyFor = (
       { observation: "The dialog can close, but the attempt still fails the return-path contract.", hint: "Restore focus to the button that opened the dialog.", whyItMatters: "Returning focus lets keyboard users continue from the exact place they left.", inspectNext: "Inspect focus after closing with Escape.", bossTaunt: "Close the trap and I will still steal your place!" },
       { observation: "The selected attempt still lacks the full keyboard close-and-return behavior.", hint: "Enable both Escape dismissal and focus restoration, then verify the opener is focused.", whyItMatters: "Dismissal and restoration are one continuous keyboard interaction.", inspectNext: "Open, press Escape, and check the Delete address button for focus.", bossTaunt: "Two steps make the exit—miss either and I win!" },
     ],
+    layout: [
+      { observation: "The action buttons visibly collide, and the rendered layout check confirms that the action group is not a flex row.", hint: "Change the action layout to a horizontal flex row.", whyItMatters: "A stable layout keeps destructive and cancel actions readable and separately targetable.", inspectNext: "Inspect display and flex-direction on the action group.", bossTaunt: "Overlapping buttons make every choice risky!" },
+      { observation: "The action group still fails its rendered CSS contract.", hint: "Use a row direction and leave a visible gap between both buttons.", whyItMatters: "Direction without spacing can still make controls look merged.", inspectNext: "Inspect display, flex-direction, and gap together.", bossTaunt: "No gap, no clarity!" },
+      { observation: "The selected attempt still has a collapsed action layout.", hint: "Set the allowlisted action layout to flex-row, then verify both buttons remain distinct.", whyItMatters: "The browser check must see the final computed flex layout, not just a code-like claim.", inspectNext: "Compare the rendered button group with its computed CSS.", bossTaunt: "Only real rendered CSS can beat this trap!" },
+    ],
   };
   if (locale === "en") return english[objectiveId][level - 1];
 
@@ -257,6 +262,11 @@ const copyFor = (
       { observation: "키보드 목표가 실패해 보이는 닫기 컨트롤만으로는 완전한 키보드 탈출 경로가 없습니다.", hint: "Escape로 대화상자가 닫히게 하세요.", whyItMatters: "표준 키보드 닫기는 빠르고 예상 가능한 탈출 방법입니다.", inspectNext: "Escape 닫기 제어 값을 확인하세요.", bossTaunt: "Escape가 없으면 나와 계속 있어야지!" },
       { observation: "대화상자가 닫혀도 이번 시도는 복귀 경로 계약을 통과하지 못했습니다.", hint: "대화상자를 연 버튼으로 포커스를 되돌리세요.", whyItMatters: "포커스 복귀는 키보드 사용자가 중단한 정확한 위치에서 계속하게 합니다.", inspectNext: "Escape로 닫은 뒤 포커스를 확인하세요.", bossTaunt: "함정을 닫아도 네 자리는 내가 훔친다!" },
       { observation: "선택한 시도에 완전한 키보드 닫기와 복귀 동작이 아직 없습니다.", hint: "Escape 닫기와 포커스 복귀를 모두 켜고 열기 버튼에 포커스가 오는지 검증하세요.", whyItMatters: "닫기와 복귀는 하나의 연속된 키보드 상호작용입니다.", inspectNext: "열고 Escape를 누른 뒤 배송지 삭제 버튼의 포커스를 확인하세요.", bossTaunt: "탈출은 두 단계야. 하나라도 놓치면 내가 이긴다!" },
+    ],
+    layout: [
+      { observation: "동작 버튼이 눈에 띄게 겹치고, 렌더된 배치 검사도 버튼 그룹이 flex 행이 아니라고 확인했습니다.", hint: "동작 버튼 배치를 가로 flex 행으로 바꾸세요.", whyItMatters: "안정적인 배치는 삭제와 취소 동작을 읽고 각각 누를 수 있게 합니다.", inspectNext: "동작 그룹의 display와 flex-direction을 확인하세요.", bossTaunt: "겹친 버튼은 모든 선택을 위험하게 만들지!" },
+      { observation: "동작 그룹이 아직 렌더된 CSS 계약을 통과하지 못했습니다.", hint: "row 방향을 사용하고 두 버튼 사이에 눈에 보이는 간격을 두세요.", whyItMatters: "방향만 맞아도 간격이 없으면 컨트롤이 하나처럼 보일 수 있습니다.", inspectNext: "display, flex-direction, gap을 함께 확인하세요.", bossTaunt: "간격이 없으면 구분도 없다!" },
+      { observation: "선택한 시도의 동작 버튼 배치가 여전히 무너져 있습니다.", hint: "허용된 동작 배치를 flex-row로 설정한 뒤 두 버튼이 분리돼 보이는지 검증하세요.", whyItMatters: "코드 설명이 아니라 브라우저의 최종 계산 배치가 검사를 통과해야 합니다.", inspectNext: "렌더된 버튼 그룹과 계산된 CSS를 비교하세요.", bossTaunt: "진짜 렌더된 CSS만이 이 함정을 이길 수 있지!" },
     ],
   };
   return korean[objectiveId][level - 1];

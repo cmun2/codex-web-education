@@ -69,6 +69,15 @@ export class DialogObjectiveEvaluator implements ObjectiveEvaluator {
 
     const closeButton = dialog?.querySelector<HTMLButtonElement>("[data-action='close']") ?? null;
     const primaryButton = dialog?.querySelector<HTMLButtonElement>("[data-action='primary']") ?? null;
+    const actions = dialog?.querySelector<HTMLElement>("[data-dialog-actions]") ?? null;
+    const actionsStyle = actions && root.ownerDocument.defaultView
+      ? root.ownerDocument.defaultView.getComputedStyle(actions)
+      : null;
+    const layout = Boolean(
+      actionsStyle?.display === "flex" &&
+      actionsStyle.flexDirection === "row" &&
+      Number.parseFloat(actionsStyle.gap || actionsStyle.columnGap) >= 8,
+    );
     const initialFocusInside = Boolean(dialog?.contains(root.ownerDocument.activeElement));
 
     primaryButton?.focus();
@@ -90,6 +99,7 @@ export class DialogObjectiveEvaluator implements ObjectiveEvaluator {
       resultFor("identity", identity, "DIALOG_SEMANTICS_VERIFIED", "DIALOG_IDENTITY_MISSING"),
       resultFor("focus", focus, "FOCUS_LOOP_VERIFIED", "FOCUS_CONTAINMENT_MISSING"),
       resultFor("keyboard", keyboard, "ESCAPE_AND_RETURN_VERIFIED", "KEYBOARD_ACTIONS_MISSING"),
+      resultFor("layout", layout, "ACTION_LAYOUT_VERIFIED", "ACTION_LAYOUT_BROKEN"),
     ];
   }
 

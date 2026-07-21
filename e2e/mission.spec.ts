@@ -28,6 +28,7 @@ test("start opens the concrete workspace and settings update preview and source 
   await expect(page.getByRole("button", { name: "Apply Changes" })).toHaveCount(0);
   await expect(page.getByText("Everything disconnected", { exact: true })).toBeVisible();
   await expect(page.getByTestId("boss-hp")).toHaveText("100");
+  await expect(page.getByLabel("Delete-dialog defect signals").getByText("Broken", { exact: true })).toHaveCount(4);
 
   await page.getByLabel("Dialog role").selectOption("dialog");
   await expect(page.getByLabel("React-like code representation")).toContainText('role="dialog"');
@@ -49,15 +50,16 @@ test("damage comes only from newly passed real browser checks", async ({ page })
 
   const attack = page.getByRole("button", { name: "Check & attack" });
   await attack.click();
-  await expect(page.getByTestId("boss-hp")).toHaveText("70");
+  await expect(page.getByTestId("boss-hp")).toHaveText("75");
   await expect(attack).toBeFocused();
   await attack.click();
-  await expect(page.getByTestId("boss-hp")).toHaveText("70");
+  await expect(page.getByTestId("boss-hp")).toHaveText("75");
 
   await page.getByLabel("Close on Escape").check();
   await page.getByLabel("Contain focus").check();
   await page.getByLabel("Restore focus").check();
-  await expect(page.getByTestId("boss-hp")).toHaveText("70");
+  await page.getByLabel("Action-button CSS layout").selectOption("flex-row");
+  await expect(page.getByTestId("boss-hp")).toHaveText("75");
   await attack.click();
   await expect(page.getByTestId("boss-hp")).toHaveText("0");
   await expect(page.getByRole("heading", { name: "Boss Defeated" })).toBeFocused();
@@ -79,8 +81,36 @@ test("new broken setup is deterministic and clears stale battle, evidence, and c
   await expect(page.getByLabel("Contain focus")).toBeChecked();
 
   await page.getByRole("button", { name: "New broken setup" }).click();
+  await expect(page.getByText("Collapsed button layout", { exact: true })).toBeVisible();
+  await expect(page.getByLabel("Action-button CSS layout")).toHaveValue("overlap");
+  await page.getByRole("button", { name: "New broken setup" }).click();
   await expect(page.getByText("Cannot close and return", { exact: true })).toBeVisible();
   await expect(page.getByLabel("Close on Escape")).not.toBeChecked();
+});
+
+test("a visible flex-layout defect is verified and its AI hint points back to the CSS control", async ({ page }) => {
+  await enterEnglishMission(page);
+  await page.getByRole("button", { name: "New broken setup" }).click();
+  await page.getByRole("button", { name: "New broken setup" }).click();
+  await expect(page.getByText("Collapsed button layout", { exact: true })).toBeVisible();
+
+  await page.getByRole("button", { name: "Delete address" }).click();
+  const actions = page.locator("[data-dialog-actions]");
+  await expect(actions).toHaveCSS("display", "grid");
+  await expect(page.getByText("flex ×", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Cancel" }).click();
+
+  await page.getByRole("button", { name: "Check & attack" }).click();
+  await expect(page.getByTestId("boss-hp")).toHaveText("25");
+  await page.getByRole("button", { name: "Why did this fail? Get a hint" }).click();
+  const layoutControl = page.getByLabel("Action-button CSS layout");
+  await expect(layoutControl.locator("xpath=..")).toHaveClass(/ai-highlight/);
+  await expect(page.getByRole("button", { name: /Why AI recommends this setting/ })).toBeVisible();
+
+  await layoutControl.selectOption("flex-row");
+  await page.getByRole("button", { name: "Delete address" }).click();
+  await expect(actions).toHaveCSS("display", "flex");
+  await expect(actions).toHaveCSS("flex-direction", "row");
 });
 
 test("coach is absent until a failed verification and reveals one requested hint inline", async ({ page }) => {
@@ -96,6 +126,8 @@ test("coach is absent until a failed verification and reveals one requested hint
   await expect(page.getByText("Demo Coach", { exact: true })).not.toBeVisible();
   await page.getByText("Hint technical details", { exact: true }).click();
   await expect(page.getByText("Demo Coach", { exact: true })).toBeVisible();
+  await expect(page.locator(".repair-control.ai-highlight")).toHaveCount(4);
+  await expect(page.getByRole("button", { name: /Why AI recommends this setting/ }).first()).toBeVisible();
 
   await page.getByLabel("Dialog role").selectOption("dialog");
   await expect(page.getByText("Visual observation", { exact: true })).toHaveCount(0);
@@ -126,6 +158,7 @@ test("replay is clean and Korean mobile keeps preview then controls without over
   await page.getByLabel("Escape로 닫기").check();
   await page.getByLabel("포커스 순환").check();
   await page.getByLabel("포커스 복귀").check();
+  await page.getByLabel("동작 버튼 CSS 배치").selectOption("flex-row");
   await page.getByRole("button", { name: "검사하고 공격" }).click();
   await page.getByRole("button", { name: "미션 다시 플레이" }).first().click();
   await expect(page.getByRole("button", { name: "미션 시작" })).toBeVisible();
@@ -168,15 +201,17 @@ test("first-attempt repair preserves evidence and diff, ranks S, and replay does
   await page.getByLabel("Close on Escape").check();
   await page.getByLabel("Contain focus").check();
   await page.getByLabel("Restore focus").check();
+  await page.getByLabel("Action-button CSS layout").selectOption("flex-row");
   await page.getByRole("button", { name: "Check & attack" }).click();
 
   await expect(page.getByRole("heading", { name: "Boss Defeated" })).toBeFocused();
   await expect(page.getByText("Perfect Repair", { exact: true })).toBeVisible();
   await expect(page.getByText("Mission rank S", { exact: true })).toBeVisible();
   await page.getByText("Attempt history & snapshot evidence", { exact: true }).click();
-  await expect(page.getByRole("button", { name: "Attempt 1 · 3/3" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Attempt 1 · 4/4" })).toBeVisible();
   await expect(page.getByRole("img", { name: "Delete-dialog snapshot for attempt 1" })).toBeVisible();
-  await expect(page.getByText(/Attempt 1 · en · 3\/3 passed/)).toBeVisible();
+  await expect(page.getByText(/Attempt 1 · en · 4\/4 passed/)).toBeVisible();
+  await expect(page.getByText("Why save this view?", { exact: true })).toBeVisible();
   await expect(page.getByText("Captured region: mission-fixture", { exact: true })).toBeVisible();
 
   await page.getByText("View code diff", { exact: true }).click();

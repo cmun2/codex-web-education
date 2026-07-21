@@ -18,11 +18,11 @@ This is a recording guide and factual shot list, not a scripted Devpost descript
 1. Fresh English landing with zero mission XP.
 2. Korean landing at a narrow mobile width with long copy visible and no horizontal page overflow.
 3. Broken dialog open before any check.
-4. Attempt 1 with three independent failures and fixture-only snapshot evidence.
+4. Attempt 1 with four independent failures and fixture-only snapshot evidence.
 5. Partial repair with identity passed, focus/keyboard failed, boss HP reduced once, and Demo Coach available.
 6. Coach response showing provider label, progressive hint level, and Return to Code Lab action.
 7. Fully repaired keyboard behavior with focus loop and Escape restoration.
-8. Victory with 0 HP, 3/3 objectives, XP/combo/rank, restored-behavior list, and debrief.
+8. Victory with 0 HP, 4/4 objectives, XP/combo/rank, restored-behavior list, and debrief.
 9. Replay at the clean landing with preserved preference/progression and no duplicate XP.
 10. Optional fallback capture with Ollama unavailable and the visible Demo Coach fallback note.
 

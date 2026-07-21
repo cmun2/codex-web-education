@@ -1,9 +1,10 @@
 "use client";
 
 import type { DialogCodeState } from "@/lib/domain/mission";
-import type { CodeDiffLine, DialogPresetId } from "@/lib/mission/code-lab";
+import type { CodeDiffLine, DialogPresetId, DialogRepairField } from "@/lib/mission/code-lab";
 import type { MissionDictionary } from "@/lib/i18n/dictionaries";
 import type { RefObject } from "react";
+import { AiHintIcon } from "@/components/ai-hint-icon";
 
 type CodeLabPanelProps = {
   copy: MissionDictionary["codeLab"];
@@ -14,6 +15,8 @@ type CodeLabPanelProps = {
   showDiff: boolean;
   validationErrors: readonly string[];
   checking: boolean;
+  highlightedFields: readonly DialogRepairField[];
+  aiHint: string | null;
   onChange: (state: DialogCodeState) => void;
   onNewSetup: () => void;
   onRunChecks: () => void;
@@ -21,6 +24,22 @@ type CodeLabPanelProps = {
   onToggleDiff: () => void;
   headingRef: RefObject<HTMLHeadingElement | null>;
 };
+
+type AiFieldTipProps = {
+  visible: boolean;
+  hint: string | null;
+  label: string;
+};
+
+function AiFieldTip({ visible, hint, label }: AiFieldTipProps) {
+  if (!visible || !hint) return null;
+
+  return (
+    <button className="ai-field-tip" type="button" data-tooltip={hint} aria-label={`${label}: ${hint}`}>
+      <AiHintIcon className="ai-hint-icon" />
+    </button>
+  );
+}
 
 export function CodeLabPanel({
   copy,
@@ -31,6 +50,8 @@ export function CodeLabPanel({
   showDiff,
   validationErrors,
   checking,
+  highlightedFields,
+  aiHint,
   onChange,
   onNewSetup,
   onRunChecks,
@@ -41,6 +62,11 @@ export function CodeLabPanel({
   const setBoolean = (field: "ariaModal" | "escapeCloses" | "focusContainment" | "focusRestoration", checked: boolean) => {
     onChange({ ...value, [field]: checked });
   };
+
+  const isHighlighted = (field: DialogRepairField): boolean => highlightedFields.some((candidate) => candidate === field);
+  const tipFor = (field: DialogRepairField) => (
+    <AiFieldTip visible={isHighlighted(field)} hint={aiHint} label={copy.aiTooltipLabel} />
+  );
 
   return (
     <section className="panel code-lab" aria-labelledby="code-lab-heading">
@@ -63,28 +89,34 @@ export function CodeLabPanel({
 
       <fieldset className="code-controls">
         <legend>{copy.controlsLegend}</legend>
-        <label>
-          <span>{copy.fields.dialogRole}</span>
-          <select value={value.dialogRole} onChange={(event) => onChange({ ...value, dialogRole: event.target.value === "dialog" ? "dialog" : "none" })}>
+        <div className={`repair-control ${isHighlighted("dialogRole") ? "ai-highlight" : ""}`}>
+          <label htmlFor="dialog-role">{copy.fields.dialogRole}</label>{tipFor("dialogRole")}
+          <select id="dialog-role" value={value.dialogRole} onChange={(event) => onChange({ ...value, dialogRole: event.target.value === "dialog" ? "dialog" : "none" })}>
             <option value="none">{copy.values.none}</option><option value="dialog">dialog</option>
           </select>
-        </label>
-        <label>
-          <span>{copy.fields.labelledBy}</span>
-          <select value={value.ariaLabelledBy} onChange={(event) => onChange({ ...value, ariaLabelledBy: event.target.value === "dialog-title" ? "dialog-title" : "none" })}>
+        </div>
+        <div className={`repair-control ${isHighlighted("ariaLabelledBy") ? "ai-highlight" : ""}`}>
+          <label htmlFor="dialog-labelledby">{copy.fields.labelledBy}</label>{tipFor("ariaLabelledBy")}
+          <select id="dialog-labelledby" value={value.ariaLabelledBy} onChange={(event) => onChange({ ...value, ariaLabelledBy: event.target.value === "dialog-title" ? "dialog-title" : "none" })}>
             <option value="none">{copy.values.none}</option><option value="dialog-title">dialog-title</option>
           </select>
-        </label>
-        <label>
-          <span>{copy.fields.describedBy}</span>
-          <select value={value.ariaDescribedBy} onChange={(event) => onChange({ ...value, ariaDescribedBy: event.target.value === "dialog-description" ? "dialog-description" : "none" })}>
+        </div>
+        <div className={`repair-control ${isHighlighted("ariaDescribedBy") ? "ai-highlight" : ""}`}>
+          <label htmlFor="dialog-describedby">{copy.fields.describedBy}</label>{tipFor("ariaDescribedBy")}
+          <select id="dialog-describedby" value={value.ariaDescribedBy} onChange={(event) => onChange({ ...value, ariaDescribedBy: event.target.value === "dialog-description" ? "dialog-description" : "none" })}>
             <option value="none">{copy.values.none}</option><option value="dialog-description">dialog-description</option>
           </select>
-        </label>
-        <label className="toggle-control"><input type="checkbox" checked={value.ariaModal} onChange={(event) => setBoolean("ariaModal", event.target.checked)} /><span>{copy.fields.ariaModal}</span></label>
-        <label className="toggle-control"><input type="checkbox" checked={value.escapeCloses} onChange={(event) => setBoolean("escapeCloses", event.target.checked)} /><span>{copy.fields.escapeCloses}</span></label>
-        <label className="toggle-control"><input type="checkbox" checked={value.focusContainment} onChange={(event) => setBoolean("focusContainment", event.target.checked)} /><span>{copy.fields.focusContainment}</span></label>
-        <label className="toggle-control"><input type="checkbox" checked={value.focusRestoration} onChange={(event) => setBoolean("focusRestoration", event.target.checked)} /><span>{copy.fields.focusRestoration}</span></label>
+        </div>
+        <div className={`repair-control repair-toggle ${isHighlighted("ariaModal") ? "ai-highlight" : ""}`}><label className="toggle-control"><input type="checkbox" checked={value.ariaModal} onChange={(event) => setBoolean("ariaModal", event.target.checked)} /><span>{copy.fields.ariaModal}</span></label>{tipFor("ariaModal")}</div>
+        <div className={`repair-control repair-toggle ${isHighlighted("escapeCloses") ? "ai-highlight" : ""}`}><label className="toggle-control"><input type="checkbox" checked={value.escapeCloses} onChange={(event) => setBoolean("escapeCloses", event.target.checked)} /><span>{copy.fields.escapeCloses}</span></label>{tipFor("escapeCloses")}</div>
+        <div className={`repair-control repair-toggle ${isHighlighted("focusContainment") ? "ai-highlight" : ""}`}><label className="toggle-control"><input type="checkbox" checked={value.focusContainment} onChange={(event) => setBoolean("focusContainment", event.target.checked)} /><span>{copy.fields.focusContainment}</span></label>{tipFor("focusContainment")}</div>
+        <div className={`repair-control repair-toggle ${isHighlighted("focusRestoration") ? "ai-highlight" : ""}`}><label className="toggle-control"><input type="checkbox" checked={value.focusRestoration} onChange={(event) => setBoolean("focusRestoration", event.target.checked)} /><span>{copy.fields.focusRestoration}</span></label>{tipFor("focusRestoration")}</div>
+        <div className={`repair-control ${isHighlighted("actionLayout") ? "ai-highlight" : ""}`}>
+          <label htmlFor="action-layout">{copy.fields.actionLayout}</label>{tipFor("actionLayout")}
+          <select id="action-layout" value={value.actionLayout} onChange={(event) => onChange({ ...value, actionLayout: event.target.value === "flex-row" ? "flex-row" : "overlap" })}>
+            <option value="overlap">{copy.values.overlap}</option><option value="flex-row">{copy.values.flexRow}</option>
+          </select>
+        </div>
       </fieldset>
 
       {validationErrors.length > 0 && <div className="validation-errors" role="alert"><strong>{copy.validationHeading}</strong><ul>{validationErrors.map((error) => <li key={error}>{error}</li>)}</ul></div>}

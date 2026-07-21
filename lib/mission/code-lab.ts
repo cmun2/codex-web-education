@@ -8,6 +8,7 @@ export const brokenDialogCode: DialogCodeState = {
   escapeCloses: false,
   focusContainment: false,
   focusRestoration: false,
+  actionLayout: "overlap",
 };
 
 export const repairedDialogCode: DialogCodeState = {
@@ -18,9 +19,11 @@ export const repairedDialogCode: DialogCodeState = {
   escapeCloses: true,
   focusContainment: true,
   focusRestoration: true,
+  actionLayout: "flex-row",
 };
 
-export type DialogPresetId = "everything-missing" | "unnamed-modal" | "keyboard-trap";
+export type DialogPresetId = "everything-missing" | "unnamed-modal" | "keyboard-trap" | "layout-collapse";
+export type DialogRepairField = keyof DialogCodeState;
 
 export type DialogPreset = {
   id: DialogPresetId;
@@ -35,6 +38,13 @@ export const dialogPresets: readonly DialogPreset[] = [
       ...repairedDialogCode,
       ariaLabelledBy: "none",
       ariaDescribedBy: "none",
+    },
+  },
+  {
+    id: "layout-collapse",
+    code: {
+      ...repairedDialogCode,
+      actionLayout: "overlap",
     },
   },
   {
@@ -60,6 +70,7 @@ const fieldNames = [
   "escapeCloses",
   "focusContainment",
   "focusRestoration",
+  "actionLayout",
 ] as const;
 
 export type CodeLabValidationError =
@@ -71,7 +82,8 @@ export type CodeLabValidationError =
   | "INVALID_DESCRIPTION_REFERENCE"
   | "INVALID_ESCAPE_BEHAVIOR"
   | "INVALID_FOCUS_CONTAINMENT"
-  | "INVALID_FOCUS_RESTORATION";
+  | "INVALID_FOCUS_RESTORATION"
+  | "INVALID_ACTION_LAYOUT";
 
 export type CodeLabValidation =
   | { ok: true; value: DialogCodeState }
@@ -94,6 +106,7 @@ export function validateDialogCodeState(input: unknown): CodeLabValidation {
   const escapeCloses = read(input, "escapeCloses");
   const focusContainment = read(input, "focusContainment");
   const focusRestoration = read(input, "focusRestoration");
+  const actionLayout = read(input, "actionLayout");
 
   if (dialogRole !== "none" && dialogRole !== "dialog") errors.push("INVALID_DIALOG_ROLE");
   if (typeof ariaModal !== "boolean") errors.push("INVALID_ARIA_MODAL");
@@ -102,6 +115,7 @@ export function validateDialogCodeState(input: unknown): CodeLabValidation {
   if (typeof escapeCloses !== "boolean") errors.push("INVALID_ESCAPE_BEHAVIOR");
   if (typeof focusContainment !== "boolean") errors.push("INVALID_FOCUS_CONTAINMENT");
   if (typeof focusRestoration !== "boolean") errors.push("INVALID_FOCUS_RESTORATION");
+  if (actionLayout !== "overlap" && actionLayout !== "flex-row") errors.push("INVALID_ACTION_LAYOUT");
 
   if (errors.length > 0) return { ok: false, errors };
   if (
@@ -111,7 +125,8 @@ export function validateDialogCodeState(input: unknown): CodeLabValidation {
     (ariaDescribedBy !== "none" && ariaDescribedBy !== "dialog-description") ||
     typeof escapeCloses !== "boolean" ||
     typeof focusContainment !== "boolean" ||
-    typeof focusRestoration !== "boolean"
+    typeof focusRestoration !== "boolean" ||
+    (actionLayout !== "overlap" && actionLayout !== "flex-row")
   ) {
     return { ok: false, errors: ["NOT_AN_OBJECT"] };
   }
@@ -126,6 +141,7 @@ export function validateDialogCodeState(input: unknown): CodeLabValidation {
       escapeCloses,
       focusContainment,
       focusRestoration,
+      actionLayout,
     },
   };
 }
@@ -137,12 +153,13 @@ const sourceLines = (state: DialogCodeState): string[] => [
   `  const escapeCloses = ${String(state.escapeCloses)};`,
   `  const containFocus = ${String(state.focusContainment)};`,
   `  const restoreFocus = ${String(state.focusRestoration)};`,
+  `  const actionLayout = "${state.actionLayout}";`,
   "  return (",
   `    <div role=${state.dialogRole === "none" ? "{undefined}" : '"dialog"'}`,
   `      aria-modal={${String(state.ariaModal)}}`,
   `      aria-labelledby=${state.ariaLabelledBy === "none" ? "{undefined}" : '"dialog-title"'}`,
   `      aria-describedby=${state.ariaDescribedBy === "none" ? "{undefined}" : '"dialog-description"'}>`,
-  "      <DialogActions />",
+  "      <DialogActions layout={actionLayout} />",
   "    </div>",
   "  );",
   "}",

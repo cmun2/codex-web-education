@@ -28,6 +28,11 @@ type Dictionary = {
     dialogDescription: string;
     close: string;
     save: string;
+    defectMapLabel: string;
+    defectMapHeading: string;
+    signals: Record<MissionObjectiveId, string>;
+    signalReady: string;
+    signalBroken: string;
   };
   mission: {
     heading: string;
@@ -72,8 +77,9 @@ type Dictionary = {
     presetLabel: string;
     presetName: Record<DialogPresetId, string>;
     presetBehavior: Record<DialogPresetId, string>;
-    fields: Record<"dialogRole" | "ariaModal" | "labelledBy" | "describedBy" | "escapeCloses" | "focusContainment" | "focusRestoration", string>;
-    values: { none: string };
+    fields: Record<"dialogRole" | "ariaModal" | "labelledBy" | "describedBy" | "escapeCloses" | "focusContainment" | "focusRestoration" | "actionLayout", string>;
+    values: { none: string; overlap: string; flexRow: string };
+    aiTooltipLabel: string;
     validationHeading: string;
     validationErrors: Record<CodeLabValidationError, string>;
     sourceLabel: string;
@@ -89,6 +95,8 @@ type Dictionary = {
     attempt: (attempt: number) => string;
     metadata: (attempt: number, locale: "ko" | "en", passed: number, capturedAt: string) => string;
     region: string;
+    purposeHeading: string;
+    purpose: string;
   };
   console: { heading: string; deterministic: string; attempt: (attempt: number) => string; empty: string };
   feed: Record<"entered-preview" | "changes-applied" | "code-reset" | "verification-started" | "verification-failed" | "verification-partial" | "verification-passed", string>;
@@ -131,11 +139,12 @@ export const dictionaries = {
       loop: ["고장 난 삭제 창을 직접 써 보기", "옆의 설정 하나 바꾸기", "검사하고 보스 공격하기"],
     },
     landing: { heading: "배송지 삭제 창을 고쳐 보세요.", body: "고장 난 창을 키보드로 써 보고, 바로 옆 설정을 바꾼 다음 실제 동작을 검사하세요.", start: "미션 시작" },
-    briefing: { eyebrow: "미션", heading: "키보드 트랩 보스", body: "삭제 창의 이름, 포커스 이동, 닫기 동작을 되살리세요.", objectivesHeading: "검사할 사용자 동작", enter: "시작" },
+    briefing: { eyebrow: "미션", heading: "키보드 트랩 보스", body: "삭제 창의 이름, 포커스와 닫기 동작, 무너진 버튼 배치를 되살리세요.", objectivesHeading: "검사할 사용자 동작", enter: "시작" },
     objectives: {
-      identity: { title: "대화상자 정체성", description: "모달 역할, 이름, 설명이 보조 기술에 전달됩니다.", behavior: "스크린 리더가 대화상자 제목과 설명을 알립니다.", codeArea: "role, aria-modal, aria-labelledby, aria-describedby", damage: "피해 30" },
-      focus: { title: "포커스 가두기", description: "포커스가 모달 안으로 이동해 머뭅니다.", behavior: "Tab과 Shift+Tab이 모달의 첫 컨트롤과 마지막 컨트롤 사이를 순환합니다.", codeArea: "focusContainment", damage: "피해 35" },
-      keyboard: { title: "키보드와 동작", description: "Escape로 닫힌 뒤 포커스가 열기 버튼으로 돌아갑니다.", behavior: "키보드 사용자가 대화상자를 닫고 중단했던 위치에서 계속합니다.", codeArea: "escapeCloses, focusRestoration", damage: "피해 35" },
+      identity: { title: "대화상자 정체성", description: "모달 역할, 이름, 설명이 보조 기술에 전달됩니다.", behavior: "스크린 리더가 대화상자 제목과 설명을 알립니다.", codeArea: "role, aria-modal, aria-labelledby, aria-describedby", damage: "피해 25" },
+      focus: { title: "포커스 가두기", description: "포커스가 모달 안으로 이동해 머뭅니다.", behavior: "Tab과 Shift+Tab이 모달의 첫 컨트롤과 마지막 컨트롤 사이를 순환합니다.", codeArea: "focusContainment", damage: "피해 25" },
+      keyboard: { title: "키보드와 동작", description: "Escape로 닫힌 뒤 포커스가 열기 버튼으로 돌아갑니다.", behavior: "키보드 사용자가 대화상자를 닫고 중단했던 위치에서 계속합니다.", codeArea: "escapeCloses, focusRestoration", damage: "피해 25" },
+      layout: { title: "버튼 Flex 배치", description: "취소와 삭제 버튼이 겹치지 않는 가로 flex 행으로 렌더됩니다.", behavior: "사용자가 두 동작을 명확히 구분하고 각각 누를 수 있습니다.", codeArea: "display, flex-direction, gap", damage: "피해 25" },
     },
     fixture: {
       regionLabel: "고장 난 UI 미리보기",
@@ -143,24 +152,29 @@ export const dictionaries = {
       modifiedLabel: "바뀐 삭제 창",
       repairedLabel: "고쳐진 삭제 창",
       heading: "저장된 배송지 삭제",
-      introduction: "삭제 버튼을 눌러 확인 창을 연 뒤, Tab과 Shift+Tab, Escape만 사용해 보세요.",
+      introduction: "삭제 버튼을 눌러 확인 창을 열고, 겹친 버튼을 눈으로 확인한 뒤 Tab, Shift+Tab, Escape도 사용해 보세요.",
       expectedLabel: "기대 동작",
-      expected: "포커스가 모달 안으로 들어가 순환하고, Escape로 닫히며, 열기 버튼으로 돌아와야 합니다.",
+      expected: "포커스가 모달 안에서 순환하고 Escape로 닫히며, 취소와 삭제 버튼이 겹치지 않아야 합니다.",
       failureLabel: "현재 실패",
-      failure: "모달에 접근 가능한 정체성이 없고 포커스가 들어오거나 갇히지 않으며 Escape로 닫히지 않습니다.",
+      failure: "버튼이 겹쳐 보이고, 모달의 이름과 포커스 경계가 없으며 Escape로 닫히지 않습니다.",
       modifiedFailure: "일부 구현 값이 변경되었습니다. 브라우저 검사를 실행해 실제 동작을 확인하세요.",
       open: "배송지 삭제",
       dialogTitle: "이 배송지를 삭제할까요?",
       dialogDescription: "서울시 중구 세종대로 110이 저장된 배송지에서 삭제됩니다.",
       close: "취소",
       save: "삭제",
+      defectMapLabel: "삭제 창 결함 신호",
+      defectMapHeading: "화면에서 바로 확인할 결함",
+      signals: { identity: "이름 전달", focus: "포커스 경계", keyboard: "Esc와 복귀", layout: "버튼 Flex" },
+      signalReady: "정상",
+      signalBroken: "결함",
     },
     mission: {
       heading: "보스 전투",
       status: "검증 현황",
       bossLabel: "키보드 트랩 보스",
       hp: (hp) => `보스 HP ${hp} / 100`,
-      objectivesProgress: (passed) => `목표 ${passed} / 3`,
+      objectivesProgress: (passed) => `목표 ${passed} / 4`,
       fixtureStatus: (status) => `삭제 창 ${status === "broken" ? "고장" : status === "modified" ? "바뀜" : "고침"}`,
       phase: { "broken-preview": "고장 난 동작을 조사하는 중", attempting: "코드 변경 사항을 적용함", verifying: "브라우저 검사를 실행하는 중", "partial-success": "일부 검사 통과 — 수리가 더 필요함", failure: "검사 실패 — 고장 난 동작을 다시 살펴보세요", victory: "승리 — 모든 브라우저 검사 통과" },
     },
@@ -196,10 +210,11 @@ export const dictionaries = {
       safeBadge: "안전한 선택지만 제공",
       controlsLegend: "삭제 창 동작 바꾸기",
       presetLabel: "현재 고장 상태",
-      presetName: { "everything-missing": "모든 연결 끊김", "unnamed-modal": "이름 없는 창", "keyboard-trap": "닫고 돌아올 수 없음" },
-      presetBehavior: { "everything-missing": "창의 이름이 전달되지 않고 포커스도 갇히며 Escape로 닫을 수 없습니다.", "unnamed-modal": "키보드는 움직이지만 스크린 리더가 이 창의 이름과 설명을 알 수 없습니다.", "keyboard-trap": "Escape로 닫히지 않고, 닫은 뒤 삭제 버튼으로 돌아오지 않습니다." },
-      fields: { dialogRole: "대화상자 role", ariaModal: "aria-modal 사용", labelledBy: "aria-labelledby", describedBy: "aria-describedby", escapeCloses: "Escape로 닫기", focusContainment: "포커스 순환", focusRestoration: "포커스 복귀" },
-      values: { none: "없음" },
+      presetName: { "everything-missing": "모든 연결 끊김", "unnamed-modal": "이름 없는 창", "keyboard-trap": "닫고 돌아올 수 없음", "layout-collapse": "버튼 배치 무너짐" },
+      presetBehavior: { "everything-missing": "이름과 키보드 연결이 끊기고 삭제 버튼도 서로 겹칩니다.", "unnamed-modal": "키보드는 움직이지만 스크린 리더가 이 창의 이름과 설명을 알 수 없습니다.", "keyboard-trap": "Escape로 닫히지 않고, 닫은 뒤 삭제 버튼으로 돌아오지 않습니다.", "layout-collapse": "동작은 가능하지만 취소와 삭제 버튼이 겹쳐 어느 버튼인지 구분하기 어렵습니다." },
+      fields: { dialogRole: "대화상자 role", ariaModal: "aria-modal 사용", labelledBy: "aria-labelledby", describedBy: "aria-describedby", escapeCloses: "Escape로 닫기", focusContainment: "포커스 순환", focusRestoration: "포커스 복귀", actionLayout: "동작 버튼 CSS 배치" },
+      values: { none: "없음", overlap: "겹침 (고장)", flexRow: "flex 가로 행 + 간격" },
+      aiTooltipLabel: "AI가 이 설정을 추천한 이유",
       validationHeading: "변경 사항을 적용하지 못했습니다",
       validationErrors: {
         NOT_AN_OBJECT: "구현 상태는 구조화된 허용 목록 값이어야 합니다.",
@@ -211,6 +226,7 @@ export const dictionaries = {
         INVALID_ESCAPE_BEHAVIOR: "Escape 동작 값이 올바르지 않습니다.",
         INVALID_FOCUS_CONTAINMENT: "포커스 순환 값이 올바르지 않습니다.",
         INVALID_FOCUS_RESTORATION: "포커스 복귀 값이 올바르지 않습니다.",
+        INVALID_ACTION_LAYOUT: "동작 버튼 배치는 겹침 또는 flex 가로 행만 선택할 수 있습니다.",
       },
       sourceLabel: "React 형태 코드 표현",
       diffLabel: "고장 난 코드와 현재 코드 비교",
@@ -223,14 +239,16 @@ export const dictionaries = {
       snapshotHeading: "삭제 창 스냅샷",
       snapshotAlt: (attempt) => `${attempt}번 시도의 삭제 창 스냅샷`,
       attempt: (attempt) => `시도 ${attempt}`,
-      metadata: (attempt, locale, passed, capturedAt) => `시도 ${attempt} · ${locale} · 통과 ${passed}/3 · ${capturedAt}`,
+      metadata: (attempt, locale, passed, capturedAt) => `시도 ${attempt} · ${locale} · 통과 ${passed}/4 · ${capturedAt}`,
       region: "캡처 영역",
+      purposeHeading: "왜 이 화면을 저장하나요?",
+      purpose: "검사 순간의 실제 삭제 창만 보관해 전후 상태를 다시 비교하고, 실패 힌트가 어떤 화면을 해석했는지 확인합니다. 페이지 밖 정보는 담지 않습니다.",
     },
     console: { heading: "검사 결과", deterministic: "실제 DOM과 키보드 동작을 검사하고 선택한 시도의 증거를 보관합니다.", attempt: (attempt) => `현재 시도 ${attempt}`, empty: "아직 검사를 실행하지 않았습니다." },
     feed: { "entered-preview": "고장 난 삭제 창을 불러왔습니다. 검사는 아직 실행하지 않았습니다.", "changes-applied": "선택한 설정이 삭제 창과 코드에 바로 반영됐습니다.", "code-reset": "현재 고장 상태의 처음 값으로 되돌렸습니다.", "verification-started": "화면에 보이는 삭제 창의 실제 키보드 동작을 확인합니다.", "verification-failed": "이번 시도에서 통과한 사용자 동작이 없습니다.", "verification-partial": "일부 사용자 동작만 통과했습니다. 새로 통과한 동작만 보스를 공격합니다.", "verification-passed": "모든 사용자 동작을 검증해 키보드 트랩 보스를 쓰러뜨렸습니다." },
     results: { heading: "브라우저 검사 결과", pending: "대기", passed: "통과", failed: "실패", checks: "확인", errors: "오류", none: "검사 전", behavior: "영향받는 사용자 동작", codeArea: "관련 코드 영역", verifiedResult: "검증 결과" },
-    checkLabels: { DIALOG_SEMANTICS_VERIFIED: "역할, 모달 상태, 이름과 설명 참조를 실제 DOM에서 확인했습니다.", FOCUS_LOOP_VERIFIED: "초기 포커스와 양방향 순환을 실제 키보드 이벤트로 확인했습니다.", ESCAPE_AND_RETURN_VERIFIED: "Escape 닫기와 열기 버튼으로의 포커스 복귀를 확인했습니다." },
-    failureCodes: { DIALOG_IDENTITY_MISSING: "대화상자의 역할, 모달 상태, 이름 또는 설명이 없습니다.", FOCUS_CONTAINMENT_MISSING: "포커스가 대화상자 안에 있지 않거나 순환 계약이 없습니다.", KEYBOARD_ACTIONS_MISSING: "키보드 닫기, 동작 또는 포커스 복귀 계약이 없습니다." },
+    checkLabels: { DIALOG_SEMANTICS_VERIFIED: "역할, 모달 상태, 이름과 설명 참조를 실제 DOM에서 확인했습니다.", FOCUS_LOOP_VERIFIED: "초기 포커스와 양방향 순환을 실제 키보드 이벤트로 확인했습니다.", ESCAPE_AND_RETURN_VERIFIED: "Escape 닫기와 열기 버튼으로의 포커스 복귀를 확인했습니다.", ACTION_LAYOUT_VERIFIED: "계산된 CSS에서 버튼 그룹의 flex 가로 방향과 간격을 확인했습니다." },
+    failureCodes: { DIALOG_IDENTITY_MISSING: "대화상자의 역할, 모달 상태, 이름 또는 설명이 없습니다.", FOCUS_CONTAINMENT_MISSING: "포커스가 대화상자 안에 있지 않거나 순환 계약이 없습니다.", KEYBOARD_ACTIONS_MISSING: "키보드 닫기, 동작 또는 포커스 복귀 계약이 없습니다.", ACTION_LAYOUT_BROKEN: "버튼 그룹이 간격 있는 flex 가로 행으로 렌더되지 않았습니다." },
     coach: {
       label: "비주얼 디버그 코치 응답",
       eyebrow: "요청할 때만 표시",
@@ -252,7 +270,7 @@ export const dictionaries = {
       progress: (level) => `단계별 힌트 ${level} / 3`,
       error: "코치 응답을 불러오지 못했습니다. 미션은 계속 진행할 수 있습니다.",
     },
-    debrief: { eyebrow: "미션 완료", heading: "학습 정리", semanticsHeading: "의미가 먼저입니다", semantics: "대화상자 역할과 접근 가능한 이름은 보조 기술에 목적과 맥락을 전달합니다. 화면 모양만으로는 이 계약을 만들 수 없습니다.", behaviorHeading: "사용자 동작으로 검증하세요", behavior: "포커스는 모달 안으로 들어가 머물고 닫을 때 트리거로 돌아가야 합니다. 비슷한 버그에서는 역할, 이름과 설명 참조, 포커스 순서, Escape 닫기, 포커스 복귀를 확인하세요." },
+    debrief: { eyebrow: "미션 완료", heading: "학습 정리", semanticsHeading: "의미와 모양을 함께 고치세요", semantics: "대화상자 역할과 접근 가능한 이름은 목적을 전달하고, flex 방향과 간격은 실제 선택지를 시각적으로 분리합니다.", behaviorHeading: "브라우저 결과로 검증하세요", behavior: "포커스·Escape·복귀뿐 아니라 계산된 display, flex-direction, gap도 확인해야 합니다. 비슷한 버그에서는 의미, 키보드 동작, CSS 배치를 함께 살펴보세요." },
     announcements: { landing: "미션 시작 화면", "broken-preview": "고장 난 삭제 창 준비 완료. 검사는 실행되지 않았습니다.", attempting: "설정이 미리보기와 코드에 반영됐습니다.", verifying: "브라우저 검사를 실행합니다.", "partial-success": "일부 검사만 통과했습니다.", failure: "브라우저 검사가 실패했습니다.", victory: "모든 검사 통과. 보스를 쓰러뜨렸습니다.", debrief: "학습 정리" },
   },
   en: {
@@ -265,11 +283,12 @@ export const dictionaries = {
       loop: ["Try the broken delete dialog", "Change one nearby setting", "Check and attack the boss"],
     },
     landing: { heading: "Repair a delivery-address delete dialog.", body: "Try the broken dialog with a keyboard, change its nearby settings, then check the real behavior.", start: "Start Mission" },
-    briefing: { eyebrow: "Mission", heading: "Keyboard Trap Boss", body: "Restore the delete dialog’s name, focus movement, and close behavior.", objectivesHeading: "User behaviors to check", enter: "Start" },
+    briefing: { eyebrow: "Mission", heading: "Keyboard Trap Boss", body: "Restore the delete dialog’s name, focus and close behavior, and collapsed button layout.", objectivesHeading: "User behaviors to check", enter: "Start" },
     objectives: {
-      identity: { title: "Dialog identity", description: "The modal role, name, and description reach assistive technology.", behavior: "A screen reader announces the dialog title and description.", codeArea: "role, aria-modal, aria-labelledby, aria-describedby", damage: "30 damage" },
-      focus: { title: "Focus containment", description: "Focus enters the modal and stays inside.", behavior: "Tab and Shift+Tab loop between the first and last modal controls.", codeArea: "focusContainment", damage: "35 damage" },
-      keyboard: { title: "Keyboard & actions", description: "Escape closes the dialog and focus returns to its opener.", behavior: "A keyboard user closes the dialog and continues from where they stopped.", codeArea: "escapeCloses, focusRestoration", damage: "35 damage" },
+      identity: { title: "Dialog identity", description: "The modal role, name, and description reach assistive technology.", behavior: "A screen reader announces the dialog title and description.", codeArea: "role, aria-modal, aria-labelledby, aria-describedby", damage: "25 damage" },
+      focus: { title: "Focus containment", description: "Focus enters the modal and stays inside.", behavior: "Tab and Shift+Tab loop between the first and last modal controls.", codeArea: "focusContainment", damage: "25 damage" },
+      keyboard: { title: "Keyboard & actions", description: "Escape closes the dialog and focus returns to its opener.", behavior: "A keyboard user closes the dialog and continues from where they stopped.", codeArea: "escapeCloses, focusRestoration", damage: "25 damage" },
+      layout: { title: "Button flex layout", description: "Cancel and Delete render as a spaced horizontal flex row.", behavior: "People can distinguish and target both actions without overlap.", codeArea: "display, flex-direction, gap", damage: "25 damage" },
     },
     fixture: {
       regionLabel: "Broken UI preview",
@@ -277,24 +296,29 @@ export const dictionaries = {
       modifiedLabel: "Changed delete dialog",
       repairedLabel: "Repaired delete dialog",
       heading: "Delete saved delivery address",
-      introduction: "Open the confirmation dialog, then try Tab, Shift+Tab, and Escape without a mouse.",
+      introduction: "Open the confirmation dialog, inspect the overlapping buttons, then try Tab, Shift+Tab, and Escape.",
       expectedLabel: "Expected Behavior",
-      expected: "Focus should enter and loop within the modal, Escape should close it, and focus should return to the opener.",
+      expected: "Focus should loop inside, Escape should close, and the Cancel and Delete buttons should never overlap.",
       failureLabel: "Current Failure",
-      failure: "The modal has no accessible identity, focus does not enter or stay inside, and Escape does not close it.",
+      failure: "The buttons overlap, the modal has no announced identity or focus boundary, and Escape does not close it.",
       modifiedFailure: "Some implementation values changed. Run checks to verify the actual browser behavior.",
       open: "Delete address",
       dialogTitle: "Delete this address?",
       dialogDescription: "110 Sejong-daero, Jung-gu, Seoul will be removed from your saved delivery addresses.",
       close: "Cancel",
       save: "Delete",
+      defectMapLabel: "Delete-dialog defect signals",
+      defectMapHeading: "Defects visible in this UI",
+      signals: { identity: "Announced name", focus: "Focus boundary", keyboard: "Esc and return", layout: "Button flex" },
+      signalReady: "Ready",
+      signalBroken: "Broken",
     },
     mission: {
       heading: "Boss battle",
       status: "Verification status",
       bossLabel: "Keyboard Trap Boss",
       hp: (hp) => `Boss HP ${hp} / 100`,
-      objectivesProgress: (passed) => `Objectives ${passed} / 3`,
+      objectivesProgress: (passed) => `Objectives ${passed} / 4`,
       fixtureStatus: (status) => `Delete dialog ${status === "broken" ? "broken" : status === "modified" ? "changed" : "repaired"}`,
       phase: { "broken-preview": "Inspecting the broken behavior", attempting: "Code changes applied", verifying: "Running browser checks", "partial-success": "Some checks passed — more repair needed", failure: "Checks failed — inspect the broken behavior again", victory: "Victory — all browser checks passed" },
     },
@@ -330,10 +354,11 @@ export const dictionaries = {
       safeBadge: "Safe choices only",
       controlsLegend: "Change delete-dialog behavior",
       presetLabel: "Current broken setup",
-      presetName: { "everything-missing": "Everything disconnected", "unnamed-modal": "Unnamed dialog", "keyboard-trap": "Cannot close and return" },
-      presetBehavior: { "everything-missing": "The dialog has no announced name, does not contain focus, and ignores Escape.", "unnamed-modal": "The keyboard works, but a screen reader cannot identify or describe the dialog.", "keyboard-trap": "Escape cannot close the dialog, and focus does not return to Delete address." },
-      fields: { dialogRole: "Dialog role", ariaModal: "Use aria-modal", labelledBy: "aria-labelledby", describedBy: "aria-describedby", escapeCloses: "Close on Escape", focusContainment: "Contain focus", focusRestoration: "Restore focus" },
-      values: { none: "None" },
+      presetName: { "everything-missing": "Everything disconnected", "unnamed-modal": "Unnamed dialog", "keyboard-trap": "Cannot close and return", "layout-collapse": "Collapsed button layout" },
+      presetBehavior: { "everything-missing": "Name and keyboard connections are missing, and the action buttons collide.", "unnamed-modal": "The keyboard works, but a screen reader cannot identify or describe the dialog.", "keyboard-trap": "Escape cannot close the dialog, and focus does not return to Delete address.", "layout-collapse": "The actions work, but Cancel and Delete overlap and are hard to distinguish." },
+      fields: { dialogRole: "Dialog role", ariaModal: "Use aria-modal", labelledBy: "aria-labelledby", describedBy: "aria-describedby", escapeCloses: "Close on Escape", focusContainment: "Contain focus", focusRestoration: "Restore focus", actionLayout: "Action-button CSS layout" },
+      values: { none: "None", overlap: "Overlap (broken)", flexRow: "Flex row with gap" },
+      aiTooltipLabel: "Why AI recommends this setting",
       validationHeading: "Changes were not applied",
       validationErrors: {
         NOT_AN_OBJECT: "Implementation state must be structured allowlisted values.",
@@ -345,6 +370,7 @@ export const dictionaries = {
         INVALID_ESCAPE_BEHAVIOR: "The Escape behavior value is invalid.",
         INVALID_FOCUS_CONTAINMENT: "The focus-containment value is invalid.",
         INVALID_FOCUS_RESTORATION: "The focus-restoration value is invalid.",
+        INVALID_ACTION_LAYOUT: "Action layout must be overlap or a horizontal flex row.",
       },
       sourceLabel: "React-like code representation",
       diffLabel: "Broken code compared with current code",
@@ -357,14 +383,16 @@ export const dictionaries = {
       snapshotHeading: "Delete-dialog snapshot",
       snapshotAlt: (attempt) => `Delete-dialog snapshot for attempt ${attempt}`,
       attempt: (attempt) => `Attempt ${attempt}`,
-      metadata: (attempt, locale, passed, capturedAt) => `Attempt ${attempt} · ${locale} · ${passed}/3 passed · ${capturedAt}`,
+      metadata: (attempt, locale, passed, capturedAt) => `Attempt ${attempt} · ${locale} · ${passed}/4 passed · ${capturedAt}`,
       region: "Captured region",
+      purposeHeading: "Why save this view?",
+      purpose: "It preserves only the real delete-dialog UI at check time, so you can compare before and after and see exactly what the hint interpreted. Nothing outside the fixture is included.",
     },
     console: { heading: "Check results", deterministic: "Checks use the real DOM and keyboard behavior and preserve evidence for each selected attempt.", attempt: (attempt) => `Current attempt ${attempt}`, empty: "No checks have run yet." },
     feed: { "entered-preview": "The broken delete dialog is ready. No checks have run yet.", "changes-applied": "The selected setting updated the delete dialog and code immediately.", "code-reset": "This broken setup returned to its starting values.", "verification-started": "Checking the rendered delete dialog’s real keyboard behavior.", "verification-failed": "No user behaviors passed in this attempt.", "verification-partial": "Some user behaviors passed. Only newly passing behavior attacks the boss.", "verification-passed": "Every user behavior is verified. Keyboard Trap Boss defeated." },
     results: { heading: "Browser check results", pending: "Pending", passed: "Passed", failed: "Failed", checks: "Verified", errors: "Errors", none: "Not run", behavior: "Affected user behavior", codeArea: "Relevant code area", verifiedResult: "Verified result" },
-    checkLabels: { DIALOG_SEMANTICS_VERIFIED: "Verified role, modal state, name, and description references in the rendered DOM.", FOCUS_LOOP_VERIFIED: "Verified initial focus and both loop directions with keyboard events.", ESCAPE_AND_RETURN_VERIFIED: "Verified Escape dismissal and focus return to the opener." },
-    failureCodes: { DIALOG_IDENTITY_MISSING: "Dialog role, modal state, name, or description is missing.", FOCUS_CONTAINMENT_MISSING: "Focus is outside the dialog or the focus-loop contract is missing.", KEYBOARD_ACTIONS_MISSING: "Keyboard close, action, or focus-return contract is missing." },
+    checkLabels: { DIALOG_SEMANTICS_VERIFIED: "Verified role, modal state, name, and description references in the rendered DOM.", FOCUS_LOOP_VERIFIED: "Verified initial focus and both loop directions with keyboard events.", ESCAPE_AND_RETURN_VERIFIED: "Verified Escape dismissal and focus return to the opener.", ACTION_LAYOUT_VERIFIED: "Verified the action group’s computed flex row and gap." },
+    failureCodes: { DIALOG_IDENTITY_MISSING: "Dialog role, modal state, name, or description is missing.", FOCUS_CONTAINMENT_MISSING: "Focus is outside the dialog or the focus-loop contract is missing.", KEYBOARD_ACTIONS_MISSING: "Keyboard close, action, or focus-return contract is missing.", ACTION_LAYOUT_BROKEN: "The action group is not rendered as a spaced horizontal flex row." },
     coach: {
       label: "Visual debug coach response",
       eyebrow: "Shown only on request",
@@ -386,7 +414,7 @@ export const dictionaries = {
       progress: (level) => `Progressive hint ${level} of 3`,
       error: "The coach response could not load. You can continue the mission.",
     },
-    debrief: { eyebrow: "Mission complete", heading: "Learning debrief", semanticsHeading: "Meaning comes first", semantics: "Dialog semantics and an accessible name give assistive technology a clear purpose and context. Visual appearance alone cannot establish that contract.", behaviorHeading: "Verify user behavior", behavior: "Focus must enter a modal, remain there, and return to its trigger when it closes. For a similar bug, inspect role, name and description references, focus order, Escape close, and focus restoration." },
+    debrief: { eyebrow: "Mission complete", heading: "Learning debrief", semanticsHeading: "Repair meaning and layout together", semantics: "Dialog semantics and an accessible name convey purpose, while flex direction and gap visually separate real choices.", behaviorHeading: "Verify browser outcomes", behavior: "Check focus, Escape, and return behavior alongside computed display, flex-direction, and gap. Similar bugs often combine semantic, keyboard, and CSS layout failures." },
     announcements: { landing: "Mission landing screen", "broken-preview": "Broken delete dialog ready. Checks have not run.", attempting: "The setting updated the preview and code.", verifying: "Running browser checks.", "partial-success": "Some browser checks passed.", failure: "Browser checks failed.", victory: "All checks passed. Boss defeated.", debrief: "Learning debrief" },
   },
 } satisfies Record<Locale, Dictionary>;

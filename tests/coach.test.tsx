@@ -15,7 +15,7 @@ import { LocalVisionCoachProvider } from "@/lib/server/local-vision-coach";
 
 const validInput = (attemptNumber = 1): CoachInput => ({
   missionId: coachMissionId,
-  failedObjectiveIds: ["identity", "focus", "keyboard"],
+  failedObjectiveIds: ["identity", "focus", "keyboard", "layout"],
   codeState: { ...brokenDialogCode },
   snapshot: {
     contract: "fixture-region-v1",

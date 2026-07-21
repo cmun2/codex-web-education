@@ -22,11 +22,12 @@ import {
 import { DialogObjectiveEvaluator } from "@/lib/mission/evaluator";
 import { captureSnapshotEvidence } from "@/lib/mission/snapshot";
 
-const objectiveIds: readonly MissionObjectiveId[] = ["identity", "focus", "keyboard"];
+const objectiveIds: readonly MissionObjectiveId[] = ["identity", "focus", "keyboard", "layout"];
 const checkCodes = {
   identity: "DIALOG_SEMANTICS_VERIFIED",
   focus: "FOCUS_LOOP_VERIFIED",
   keyboard: "ESCAPE_AND_RETURN_VERIFIED",
+  layout: "ACTION_LAYOUT_VERIFIED",
 } as const;
 
 const result = (objectiveId: MissionObjectiveId, passed: boolean): ObjectiveResult => ({
@@ -35,7 +36,7 @@ const result = (objectiveId: MissionObjectiveId, passed: boolean): ObjectiveResu
   checks: passed ? [checkCodes[objectiveId]] : [],
   failureCodes: passed
     ? []
-    : [objectiveId === "identity" ? "DIALOG_IDENTITY_MISSING" : objectiveId === "focus" ? "FOCUS_CONTAINMENT_MISSING" : "KEYBOARD_ACTIONS_MISSING"],
+    : [objectiveId === "identity" ? "DIALOG_IDENTITY_MISSING" : objectiveId === "focus" ? "FOCUS_CONTAINMENT_MISSING" : objectiveId === "keyboard" ? "KEYBOARD_ACTIONS_MISSING" : "ACTION_LAYOUT_BROKEN"],
 });
 
 const snapshotFor = (attemptNumber: number, objectives: ObjectiveResult[]): SnapshotEvidence => ({
@@ -89,7 +90,7 @@ describe("allowlisted Code Lab", () => {
   });
 
   it("keeps every curated broken setup inside the typed allowlist", () => {
-    expect(dialogPresets.map((preset) => preset.id)).toEqual(["everything-missing", "unnamed-modal", "keyboard-trap"]);
+    expect(dialogPresets.map((preset) => preset.id)).toEqual(["everything-missing", "unnamed-modal", "layout-collapse", "keyboard-trap"]);
     for (const preset of dialogPresets) {
       expect(validateDialogCodeState(preset.code)).toEqual({ ok: true, value: preset.code });
     }
@@ -101,21 +102,21 @@ describe("battle domain", () => {
     expect(initialBattleState).toMatchObject({ phase: "landing", hp: 100, fixture: "broken", results: [], history: [], xpEarned: 0, combo: 0 });
     const identityOnly = objectiveIds.map((id) => result(id, id === "identity"));
     const first = battleReducer(initialBattleState, { type: "RESULTS", result: verification(1, identityOnly) });
-    expect(first.hp).toBe(70);
+    expect(first.hp).toBe(75);
     expect(first.verifiedObjectiveIds).toEqual(["identity"]);
-    expect(first).toMatchObject({ xpEarned: 100, combo: 1, attempt: 2 });
-    expect(first.lastHit).toMatchObject({ damage: 30, xp: 100, accessibilityCriticalHit: true });
+    expect(first).toMatchObject({ xpEarned: 75, combo: 1, attempt: 2 });
+    expect(first.lastHit).toMatchObject({ damage: 25, xp: 75, accessibilityCriticalHit: true });
 
     const repeated = battleReducer(first, { type: "RESULTS", result: verification(2, identityOnly) });
-    expect(repeated.hp).toBe(70);
+    expect(repeated.hp).toBe(75);
     expect(repeated.history).toHaveLength(2);
-    expect(repeated).toMatchObject({ xpEarned: 100, combo: 0, lastHit: null, attempt: 3 });
+    expect(repeated).toMatchObject({ xpEarned: 75, combo: 0, lastHit: null, attempt: 3 });
 
     const focusOnly = objectiveIds.map((id) => result(id, id === "focus"));
     const next = battleReducer(repeated, { type: "RESULTS", result: verification(3, focusOnly) });
-    expect(next.hp).toBe(35);
+    expect(next.hp).toBe(50);
     expect(next.verifiedObjectiveIds).toEqual(["identity", "focus"]);
-    expect(next).toMatchObject({ xpEarned: 200, combo: 1 });
+    expect(next).toMatchObject({ xpEarned: 150, combo: 1 });
   });
 
   it("clears verification rewards when a new broken setup is loaded", () => {
@@ -130,26 +131,26 @@ describe("battle domain", () => {
     const first = battleReducer(initialBattleState, { type: "RESULTS", result: verification(1, identityOnly) });
     const remaining = objectiveIds.map((id) => result(id, id !== "identity"));
     const victory = battleReducer(first, { type: "RESULTS", result: verification(2, remaining) });
-    expect(victory).toMatchObject({ phase: "victory", xpEarned: 300, combo: 3, rank: "A", perfectRepair: false, attempt: 3 });
+    expect(victory).toMatchObject({ phase: "victory", xpEarned: 300, combo: 4, rank: "A", perfectRepair: false, attempt: 3 });
     expect(victory.history).toHaveLength(2);
-    expect(victory.lastHit).toMatchObject({ damage: 70, xp: 200, combo: 3 });
+    expect(victory.lastHit).toMatchObject({ damage: 75, xp: 225, combo: 4 });
 
     const perfect = battleReducer(initialBattleState, {
       type: "RESULTS",
       result: verification(1, objectiveIds.map((id) => result(id, true))),
     });
-    expect(perfect).toMatchObject({ phase: "victory", hp: 0, xpEarned: 300, combo: 3, rank: "S", perfectRepair: true });
+    expect(perfect).toMatchObject({ phase: "victory", hp: 0, xpEarned: 300, combo: 4, rank: "S", perfectRepair: true });
     expect(rankForAttempts(2)).toBe("A");
     expect(rankForAttempts(3)).toBe("B");
     expect(rankForAttempts(4)).toBe("C");
-    expect(xpForObjectives(["identity", "focus", "keyboard"])).toBe(300);
+    expect(xpForObjectives(["identity", "focus", "keyboard", "layout"])).toBe(300);
   });
 
   it("keeps independent failures visible and completes only through verified results", () => {
     const mixed = objectiveIds.map((id) => result(id, id !== "focus"));
-    expect(mixed.map((item) => item.status)).toEqual(["passed", "failed", "passed"]);
-    expect(bossHealth(mixed)).toBe(35);
-    expect(missionComplete(["identity", "keyboard"])).toBe(false);
+    expect(mixed.map((item) => item.status)).toEqual(["passed", "failed", "passed", "passed"]);
+    expect(bossHealth(mixed)).toBe(25);
+    expect(missionComplete(["identity", "keyboard", "layout"])).toBe(false);
     const partial = battleReducer(initialBattleState, { type: "RESULTS", result: verification(1, mixed) });
     expect(partial.phase).toBe("partial-success");
     const final = battleReducer(partial, { type: "RESULTS", result: verification(2, objectiveIds.map((id) => result(id, id === "focus"))) });
@@ -203,6 +204,15 @@ const renderFixture = (codeState: DialogCodeState): HTMLElement => {
     close.dataset.action = "close";
     const primary = document.createElement("button");
     primary.dataset.action = "primary";
+    const actions = document.createElement("div");
+    actions.dataset.dialogActions = "";
+    if (codeState.actionLayout === "flex-row") {
+      actions.style.display = "flex";
+      actions.style.flexDirection = "row";
+      actions.style.gap = "8px";
+    } else {
+      actions.style.display = "grid";
+    }
     const closeDialog = () => {
       dialog.remove();
       if (codeState.focusRestoration) trigger.focus();
@@ -216,7 +226,8 @@ const renderFixture = (codeState: DialogCodeState): HTMLElement => {
         else if (!event.shiftKey && document.activeElement === primary) close.focus();
       }
     });
-    dialog.append(title, description, close, primary);
+    actions.append(close, primary);
+    dialog.append(title, description, actions);
     fixture.append(dialog);
     if (codeState.focusContainment) close.focus();
   };
@@ -234,7 +245,7 @@ describe("rendered behavior evaluation and snapshot evidence", () => {
     const root = renderFixture({ ...repairedDialogCode, focusContainment: false });
     const evaluator = new DialogObjectiveEvaluator();
     const objectives = await evaluator.evaluate(root);
-    expect(objectives.map((objective) => objective.status)).toEqual(["passed", "failed", "passed"]);
+    expect(objectives.map((objective) => objective.status)).toEqual(["passed", "failed", "passed", "passed"]);
     expect(root.querySelector("[data-testid='mission-dialog']")).not.toBeNull();
     await evaluator.cleanup(root);
     expect(root.querySelector("[data-testid='mission-dialog']")).toBeNull();

@@ -6,7 +6,7 @@ import { CodeLabPanel } from "@/components/code-lab";
 import { MissionDialog } from "@/components/mission-dialog";
 import { VisualCoach } from "@/components/visual-coach";
 import { battleReducer, initialBattleState, type MissionPhase } from "@/lib/domain/battle";
-import { keyboardTrapObjectives, type ObjectiveResult, type ObjectiveStatus, type VerificationResult } from "@/lib/domain/mission";
+import { keyboardTrapObjectives, type MissionObjectiveId, type ObjectiveResult, type ObjectiveStatus, type VerificationResult } from "@/lib/domain/mission";
 import { coachMissionId, type CoachInsight } from "@/lib/domain/providers";
 import { dictionaries, statusLabel, type Locale, type MissionDictionary } from "@/lib/i18n/dictionaries";
 import { getLocaleSnapshot, getServerLocaleSnapshot, selectLocale, subscribeToLocale } from "@/lib/i18n/locale";
@@ -17,6 +17,7 @@ import {
   dialogPresets,
   isFullyRepaired,
   type DialogPresetId,
+  type DialogRepairField,
   type RepairProvider,
 } from "@/lib/mission/code-lab";
 import { DialogObjectiveEvaluator } from "@/lib/mission/evaluator";
@@ -35,6 +36,12 @@ const activeMissionPhases: readonly ActiveMissionPhase[] = ["broken-preview", "a
 const isActivePhase = (phase: MissionPhase): phase is ActiveMissionPhase => activeMissionPhases.some((activePhase) => activePhase === phase);
 const repairProvider: RepairProvider = new AllowlistedDialogCodeLab();
 const objectiveEvaluator = new DialogObjectiveEvaluator();
+const repairFieldsForObjective: Record<MissionObjectiveId, readonly DialogRepairField[]> = {
+  identity: ["dialogRole", "ariaModal", "ariaLabelledBy", "ariaDescribedBy"],
+  focus: ["focusContainment"],
+  keyboard: ["escapeCloses", "focusRestoration"],
+  layout: ["actionLayout"],
+};
 
 function LanguageSwitcher({ locale, copy, onChange }: { locale: Locale; copy: MissionDictionary; onChange: (locale: Locale) => void }) {
   return (
@@ -299,6 +306,7 @@ export function MissionRunner() {
 
   const selectedVerification: VerificationResult | undefined =
     state.history.find((entry) => entry.attempt.number === selectedAttempt) ?? state.history[state.history.length - 1];
+  const hintedObjectiveId = selectedVerification?.objectives.find((result) => result.status === "failed")?.objectiveId;
 
   const askCoach = async () => {
     if (!selectedVerification || coachLoading) return;
@@ -439,6 +447,8 @@ export function MissionRunner() {
                 showDiff={showDiff}
                 validationErrors={validationErrors}
                 checking={checking}
+                highlightedFields={coach && hintedObjectiveId ? repairFieldsForObjective[hintedObjectiveId] : []}
+                aiHint={coach?.hint ?? null}
                 onChange={updateCode}
                 onNewSetup={loadNextPreset}
                 onRunChecks={runChecks}

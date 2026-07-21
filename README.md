@@ -1,18 +1,16 @@
-# Frontend Debugging Arena — Working Title
+# Codex Web Education
 
-Frontend Debugging Arena is a bilingual learning prototype where a learner experiences a real frontend accessibility failure, repairs a constrained implementation, and proves the behavior with independent browser checks. Every newly verified objective damages the boss. The first mission, **Keyboard Trap Boss**, covers dialog identity, focus containment, Escape dismissal, and focus restoration in Korean and English.
-
-This repository uses a descriptive working title; final naming and submission prose remain human decisions.
+Codex Web Education is a bilingual direct-manipulation learning game where a learner sees a real frontend failure, repairs a constrained implementation, and proves the result with independent browser checks. Every newly verified objective damages the active boss; changing a setting or clicking a button never awards progress by itself.
 
 ## What the demo includes
 
-- A Korean/English landing, briefing, mission, victory, debrief, history, error, and accessibility-announcement experience.
-- A deliberately broken, isolated dialog fixture that can be explored with a keyboard.
-- A deterministic `RepairProvider` that accepts seven typed, allowlisted values. The React-like snippet is explanatory text and is never executed or evaluated.
-- A rendered-DOM objective evaluator for dialog semantics, both focus-loop directions, Escape dismissal, and focus return.
+- A Korean/English mission picker, direct repair workspace, victory, debrief, history, error, and accessibility-announcement experience.
+- Five deliberately broken, isolated fixtures: **Keyboard Trap** for dialog accessibility, **Flex Tangle** for computed layout, **Motion Phantom** for animation and reduced motion, **Stream Gremlin** for a safe deterministic SSE simulation, and **State Doppelganger** for immutable shared state and reset behavior.
+- A deterministic `RepairProvider` that accepts only typed, mission-specific allowlisted values. The React-like snippet is explanatory text and is never executed or evaluated.
+- Rendered-DOM objective evaluators for dialog semantics and keyboard behavior, computed Flexbox layout, animation timing and reduced-motion fallback, simulated stream parsing and reconnect policy, and state update/reset behavior.
 - A `fixture-region-v1` evidence snapshot for every attempt, with locale, timestamp, dimensions, allowlisted code state, and objective results.
 - Deterministic HP, XP, combo, rank, replay, sound preference, and local progression. Storage failure falls back to in-memory play.
-- A deterministic Demo Coach that needs no model, key, account, or network service, plus an optional server-local Ollama vision provider with deterministic fallback.
+- A deterministic Demo Coach that appears only after a verified failure, highlights unresolved controls, and needs no model, key, account, or network service, plus an optional server-local Ollama vision provider with deterministic fallback.
 
 ## Local setup
 
@@ -23,7 +21,7 @@ npm ci
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000). The deterministic demo needs no environment file, account, database, API key, or AI server.
+Open [http://localhost:3000](http://localhost:3000). The deterministic demo needs no environment file, account, database, API key, or AI server. Choose a mission, try the visibly broken fixture, change an adjacent safe setting, then use **Check & attack** to verify the actual browser outcome.
 
 Before a verified checkpoint, run the complete suite:
 
@@ -73,9 +71,9 @@ Codex and GPT-5.6 were development tools used for accessibility analysis, archit
 
 ## Current limitations
 
-- One authored mission and one dialog-specific repair vocabulary are included.
-- Objective checks demonstrate the mission contract; they are not a general accessibility audit.
+- The five authored missions use curated repair vocabularies; this is intentionally not a generic editor or code runner.
+- Objective checks demonstrate each mission contract; they are not a general accessibility, CSS, networking, or state-management audit.
 - Evidence snapshots capture only the authored fixture region and are not full-page screenshots.
 - Progress is local to the browser and intentionally has no cross-device sync.
 - Sound is optional feedback; no learning result depends on audio.
-- The final product name, public demo, deployment URL, screenshots, and submission copy still require human review.
+- A public deployment URL still requires a human-owned hosting account; local development and the deterministic test suite require no external service.

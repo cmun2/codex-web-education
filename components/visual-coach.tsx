@@ -28,7 +28,6 @@ export function VisualCoach({
     <section className="visual-coach" aria-labelledby="visual-coach-heading">
       <div className="section-heading-row">
         <div>
-          <p className="eyebrow">{copy.eyebrow}</p>
           <h3 id="visual-coach-heading">{copy.heading}</h3>
           <p>{copy.description}</p>
         </div>
@@ -41,25 +40,27 @@ export function VisualCoach({
       >
         {loading ? copy.loading : hintAlreadyRevealed ? copy.revealed : copy.ask}
       </button>
-      {!canAsk && <p className="coach-empty">{copy.afterFailure}</p>}
       <p className="sr-only" aria-live="polite" aria-atomic="true">
         {loading ? copy.loading : insight ? copy.loaded : error ? copy.error : ""}
       </p>
 
       {insight && (
         <aside className="coach" aria-live="polite" aria-label={copy.label}>
-          <div className="coach-heading-row">
-            <strong>{insight.provider === "local-vision" ? copy.localLabel : copy.demoLabel}</strong>
-            <span>{copy.progress(insight.hintLevel)}</span>
-          </div>
-          {insight.usedFallback && <p className="fallback-note">{copy.fallback}</p>}
           <h4>{copy.observationLabel}</h4>
           <p>{insight.observation}</p>
           <h4>{copy.hintLabel}</h4>
           <p>{insight.hint}</p>
-          <p><b>{copy.whyLabel}:</b> {insight.whyItMatters}</p>
-          <p><b>{copy.inspectLabel}:</b> {insight.inspectNext}</p>
-          <i>{insight.bossTaunt}</i>
+          <details>
+            <summary>{copy.advanced}</summary>
+            <div className="coach-heading-row">
+              <strong>{insight.provider === "local-vision" ? copy.localLabel : copy.demoLabel}</strong>
+              <span>{copy.progress(insight.hintLevel)}</span>
+            </div>
+            {insight.usedFallback && <p className="fallback-note">{copy.fallback}</p>}
+            <p><b>{copy.whyLabel}:</b> {insight.whyItMatters}</p>
+            <p><b>{copy.inspectLabel}:</b> {insight.inspectNext}</p>
+            <i>{insight.bossTaunt}</i>
+          </details>
           <button className="text-action" type="button" onClick={onReturnToCodeLab}>{copy.returnToCodeLab}</button>
         </aside>
       )}

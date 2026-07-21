@@ -53,10 +53,11 @@ export function CodeLabPanel({
         <span className="safe-badge">{copy.safeBadge}</span>
       </div>
 
-      <div className="preset-card" role="status">
+      <div className="preset-card">
         <span>{copy.presetLabel}</span>
         <strong>{copy.presetName[presetId]}</strong>
         <p>{copy.presetBehavior[presetId]}</p>
+        <p className="sr-only" aria-live="polite" aria-atomic="true">{copy.presetName[presetId]}. {copy.presetBehavior[presetId]}</p>
         <button className="secondary-action" type="button" onClick={onNewSetup}>{copy.actions.newSetup}</button>
       </div>
 

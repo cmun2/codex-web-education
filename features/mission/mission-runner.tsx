@@ -110,6 +110,7 @@ export function MissionRunner() {
   const [coach, setCoach] = useState<CoachInsight | null>(null);
   const [coachError, setCoachError] = useState(false);
   const [coachLoading, setCoachLoading] = useState(false);
+  const [coachAvailable, setCoachAvailable] = useState(false);
   const [coachedAttempt, setCoachedAttempt] = useState<number | null>(null);
   const [selectedAttempt, setSelectedAttempt] = useState<number | null>(null);
   const [codeState, setCodeState] = useState({ ...brokenDialogCode });
@@ -192,6 +193,12 @@ export function MissionRunner() {
       return;
     }
     setValidationErrors([]);
+    setCoach(null);
+    setCoachError(false);
+    setCoachLoading(false);
+    setCoachedAttempt(null);
+    setCoachAvailable(false);
+    coachRequestRef.current += 1;
     setCodeState(validation.value);
     dispatch({ type: "CHANGES_APPLIED", fixture: isFullyRepaired(validation.value) ? "repaired" : "modified" });
   };
@@ -217,6 +224,7 @@ export function MissionRunner() {
       setSelectedAttempt(state.attempt);
       setCoach(null);
       setCoachError(false);
+      setCoachAvailable(objectiveResults.some((result) => result.status === "failed"));
       coachRequestRef.current += 1;
       setCoachLoading(false);
       dispatch({
@@ -233,6 +241,12 @@ export function MissionRunner() {
     setCodeState(reset);
     setValidationErrors([]);
     setShowDiff(false);
+    setCoach(null);
+    setCoachError(false);
+    setCoachLoading(false);
+    setCoachedAttempt(null);
+    setCoachAvailable(false);
+    coachRequestRef.current += 1;
     dispatch({ type: "CODE_RESET", fixture: presetId === "everything-missing" ? "broken" : "modified" });
   };
 
@@ -248,6 +262,7 @@ export function MissionRunner() {
     setCoachError(false);
     setCoachLoading(false);
     setCoachedAttempt(null);
+    setCoachAvailable(false);
     setSelectedAttempt(null);
     coachRequestRef.current += 1;
     completionRecordedRef.current = false;
@@ -259,6 +274,7 @@ export function MissionRunner() {
     setCoachError(false);
     setCoachLoading(false);
     setCoachedAttempt(null);
+    setCoachAvailable(false);
     setSelectedAttempt(null);
     setCodeState({ ...brokenDialogCode });
     setPresetId("everything-missing");
@@ -433,7 +449,7 @@ export function MissionRunner() {
               <section className="panel objectives-panel" aria-labelledby="objectives-heading">
                 <h2 id="objectives-heading">{copy.briefing.objectivesHeading}</h2>
                 <ObjectiveList copy={copy} results={state.results} />
-                {selectedVerification?.objectives.some((result) => result.status === "failed") && (
+                {coachAvailable && selectedVerification?.objectives.some((result) => result.status === "failed") && (
                   <VisualCoach
                     copy={copy.coach}
                     insight={coach}

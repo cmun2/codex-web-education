@@ -4,7 +4,7 @@ This is factual source material for a human-authored Build Week submission, not 
 
 ## Problem framing
 
-The development session analyzed a modal missing dialog identity, accessible naming and description, focus entry/containment/restoration, and Escape handling. That issue became Keyboard Trap Boss: three independently evaluated browser-objective groups that deal boss damage only after verified behavior.
+The development session analyzed a modal missing dialog identity, accessible naming and description, focus entry/containment/restoration, Escape handling, and a visibly collapsed action layout. That issue became Keyboard Trap Boss: four independently evaluated browser-objective groups that deal boss damage only after verified behavior.
 
 ## Development contributions
 

@@ -4,7 +4,7 @@
 
 `features/mission/mission-runner.tsx` coordinates a reducer-driven journey: landing → briefing → broken preview → repair attempt → verification → partial/failure feedback → victory → debrief → replay. Korean and English dictionaries cover the same typed copy contract. Phase changes move focus to the new heading, results and damage have live announcements, controls have accessible names, and motion-heavy feedback is reduced under `prefers-reduced-motion`.
 
-The deterministic battle state in `lib/domain/battle.ts` is the only source for mission phase, history, verified objectives, HP, XP, combo, rank, and victory. Damage is 30/35/35 and is awarded only once for each newly verified objective; repeated passing checks cannot duplicate damage or XP.
+The deterministic battle state in `lib/domain/battle.ts` is the only source for mission phase, history, verified objectives, HP, XP, combo, rank, and victory. Four independent objectives award 25 damage and 75 XP apiece, only once after the evaluator verifies each objective; repeated passing checks cannot duplicate damage or XP.
 
 ## Typed boundaries
 

@@ -1,8 +1,9 @@
-export type MissionObjectiveId = "identity" | "focus" | "keyboard";
+export type MissionObjectiveId = "identity" | "focus" | "keyboard" | "layout";
 export type ObjectiveStatus = "pending" | "passed" | "failed";
 
 export type DialogRole = "none" | "dialog";
 export type DialogReference = "none" | "dialog-title" | "dialog-description";
+export type DialogActionLayout = "overlap" | "flex-row";
 
 export type DialogCodeState = {
   dialogRole: DialogRole;
@@ -12,6 +13,7 @@ export type DialogCodeState = {
   escapeCloses: boolean;
   focusContainment: boolean;
   focusRestoration: boolean;
+  actionLayout: DialogActionLayout;
 };
 
 export type MissionObjective = {
@@ -23,7 +25,8 @@ export type MissionObjective = {
 export type CheckCode =
   | "DIALOG_SEMANTICS_VERIFIED"
   | "FOCUS_LOOP_VERIFIED"
-  | "ESCAPE_AND_RETURN_VERIFIED";
+  | "ESCAPE_AND_RETURN_VERIFIED"
+  | "ACTION_LAYOUT_VERIFIED";
 
 export type ObjectiveResult = {
   objectiveId: MissionObjectiveId;
@@ -35,7 +38,8 @@ export type ObjectiveResult = {
 export type FailureCode =
   | "DIALOG_IDENTITY_MISSING"
   | "FOCUS_CONTAINMENT_MISSING"
-  | "KEYBOARD_ACTIONS_MISSING";
+  | "KEYBOARD_ACTIONS_MISSING"
+  | "ACTION_LAYOUT_BROKEN";
 
 export type SnapshotEvidence = {
   contract: "fixture-region-v1";
@@ -61,9 +65,10 @@ export type VerificationResult = {
 };
 
 export const keyboardTrapObjectives: readonly MissionObjective[] = [
-  { id: "identity", damage: 30, xp: 100 },
-  { id: "focus", damage: 35, xp: 100 },
-  { id: "keyboard", damage: 35, xp: 100 },
+  { id: "identity", damage: 25, xp: 75 },
+  { id: "focus", damage: 25, xp: 75 },
+  { id: "keyboard", damage: 25, xp: 75 },
+  { id: "layout", damage: 25, xp: 75 },
 ];
 
 export const damageForObjectives = (objectiveIds: readonly MissionObjectiveId[]): number =>

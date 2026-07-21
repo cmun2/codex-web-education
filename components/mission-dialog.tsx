@@ -44,14 +44,20 @@ export function MissionDialog({ codeState, copy, open, onOpenChange, onPrimary }
     }
   };
 
-  const status =
-    codeState.dialogRole === "dialog" &&
+  const identityReady = codeState.dialogRole === "dialog" &&
     codeState.ariaModal &&
     codeState.ariaLabelledBy === "dialog-title" &&
-    codeState.ariaDescribedBy === "dialog-description" &&
-    codeState.escapeCloses &&
-    codeState.focusContainment &&
-    codeState.focusRestoration
+    codeState.ariaDescribedBy === "dialog-description";
+  const focusReady = codeState.focusContainment;
+  const keyboardReady = codeState.escapeCloses && codeState.focusRestoration;
+  const layoutReady = codeState.actionLayout === "flex-row";
+  const signalStates = [
+    { id: "identity", ready: identityReady },
+    { id: "focus", ready: focusReady },
+    { id: "keyboard", ready: keyboardReady },
+    { id: "layout", ready: layoutReady },
+  ] as const;
+  const status = identityReady && focusReady && keyboardReady && layoutReady
       ? "repaired"
       : codeState.dialogRole === "none" &&
           !codeState.ariaModal &&
@@ -59,7 +65,8 @@ export function MissionDialog({ codeState, copy, open, onOpenChange, onPrimary }
           codeState.ariaDescribedBy === "none" &&
           !codeState.escapeCloses &&
           !codeState.focusContainment &&
-          !codeState.focusRestoration
+          !codeState.focusRestoration &&
+          codeState.actionLayout === "overlap"
         ? "broken"
         : "modified";
 
@@ -70,6 +77,18 @@ export function MissionDialog({ codeState, copy, open, onOpenChange, onPrimary }
       </p>
       <h2>{copy.heading}</h2>
       <p>{copy.introduction}</p>
+      <div className="defect-map" aria-label={copy.defectMapLabel}>
+        <p>{copy.defectMapHeading}</p>
+        <ul>
+          {signalStates.map((signal) => (
+            <li key={signal.id} className={signal.ready ? "signal-ready" : "signal-broken"}>
+              <span aria-hidden="true">{signal.ready ? "✓" : "×"}</span>
+              <strong>{copy.signals[signal.id]}</strong>
+              <small>{signal.ready ? copy.signalReady : copy.signalBroken}</small>
+            </li>
+          ))}
+        </ul>
+      </div>
       <dl className="behavior-contract">
         <div>
           <dt>{copy.expectedLabel}</dt>
@@ -94,12 +113,21 @@ export function MissionDialog({ codeState, copy, open, onOpenChange, onPrimary }
             aria-modal={codeState.ariaModal}
             aria-labelledby={codeState.ariaLabelledBy === "dialog-title" ? "dialog-title" : undefined}
             aria-describedby={codeState.ariaDescribedBy === "dialog-description" ? "dialog-description" : undefined}
-            className="dialog"
+            className={`dialog ${identityReady ? "" : "has-identity-defect"} ${layoutReady ? "" : "has-layout-defect"}`}
             onKeyDown={handleKeyDown}
           >
+            <div className="dialog-debug-strip" aria-hidden="true">
+              {!identityReady && <span>role / name ?</span>}
+              {!keyboardReady && <span>Esc ×</span>}
+              {!layoutReady && <span>flex ×</span>}
+            </div>
             <h3 id="dialog-title">{copy.dialogTitle}</h3>
             <p id="dialog-description">{copy.dialogDescription}</p>
-            <div className="dialog-actions">
+            <div
+              className={`dialog-actions ${layoutReady ? "is-flex-row" : "is-overlap"}`}
+              data-dialog-actions
+              style={layoutReady ? { display: "flex", flexDirection: "row", gap: "8px" } : { display: "grid" }}
+            >
               <button ref={closeRef} data-action="close" type="button" onClick={closeDialog}>
                 {copy.close}
               </button>

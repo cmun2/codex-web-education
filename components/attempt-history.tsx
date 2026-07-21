@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import type { VerificationResult } from "@/lib/domain/mission";
+import { keyboardTrapObjectives, type VerificationResult } from "@/lib/domain/mission";
 import type { MissionDictionary } from "@/lib/i18n/dictionaries";
 
 export function AttemptHistory({
@@ -22,6 +22,10 @@ export function AttemptHistory({
 
   return (
     <div className="attempt-history">
+      <aside className="snapshot-purpose">
+        <strong>{copy.purposeHeading}</strong>
+        <p>{copy.purpose}</p>
+      </aside>
       <div className="attempt-tabs" role="group" aria-label={copy.selectLabel}>
         {history.map((entry) => (
           <button
@@ -30,7 +34,7 @@ export function AttemptHistory({
             key={entry.attempt.number}
             onClick={() => onSelectAttempt(entry.attempt.number)}
           >
-            {copy.attempt(entry.attempt.number)} · {entry.objectives.filter((objective) => objective.status === "passed").length}/3
+            {copy.attempt(entry.attempt.number)} · {entry.objectives.filter((objective) => objective.status === "passed").length}/{keyboardTrapObjectives.length}
           </button>
         ))}
       </div>

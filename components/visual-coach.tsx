@@ -2,6 +2,7 @@
 
 import type { CoachInsight } from "@/lib/domain/providers";
 import type { MissionDictionary } from "@/lib/i18n/dictionaries";
+import { AiHintIcon } from "@/components/ai-hint-icon";
 
 type VisualCoachProps = {
   copy: MissionDictionary["coach"];
@@ -38,7 +39,8 @@ export function VisualCoach({
         onClick={onAsk}
         disabled={!canAsk || loading || hintAlreadyRevealed}
       >
-        {loading ? copy.loading : hintAlreadyRevealed ? copy.revealed : copy.ask}
+        <AiHintIcon className="ai-hint-icon" />
+        <span>{loading ? copy.loading : hintAlreadyRevealed ? copy.revealed : copy.ask}</span>
       </button>
       <p className="sr-only" aria-live="polite" aria-atomic="true">
         {loading ? copy.loading : insight ? copy.loaded : error ? copy.error : ""}

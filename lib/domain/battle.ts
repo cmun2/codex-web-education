@@ -1,9 +1,11 @@
 import {
   bossHealthForVerifiedObjectives,
   damageForObjectives,
+  keyboardTrapObjectives,
   missionComplete,
   xpForObjectives,
   type MissionObjectiveId,
+  type MissionObjective,
   type ObjectiveResult,
   type VerificationResult,
 } from "@/lib/domain/mission";
@@ -50,17 +52,18 @@ export type BattleState = {
   lastHit: BattleHit | null;
   rank: MissionRank | null;
   perfectRepair: boolean;
+  objectives: readonly MissionObjective[];
 };
 
 export type BattleAction =
   | { type: "START_MISSION" }
   | { type: "CHANGES_APPLIED"; fixture: Exclude<FixtureStatus, "broken"> }
-  | { type: "NEW_BROKEN_SETUP"; fixture: FixtureStatus }
+  | { type: "NEW_BROKEN_SETUP"; fixture: FixtureStatus; objectives?: readonly MissionObjective[] }
   | { type: "CODE_RESET"; fixture: FixtureStatus }
   | { type: "BEGIN_VERIFICATION" }
   | { type: "RESULTS"; result: VerificationResult }
   | { type: "SHOW_DEBRIEF" }
-  | { type: "REPLAY" };
+  | { type: "REPLAY"; objectives?: readonly MissionObjective[] };
 
 export const initialBattleState: BattleState = {
   phase: "landing",
@@ -76,6 +79,7 @@ export const initialBattleState: BattleState = {
   lastHit: null,
   rank: null,
   perfectRepair: false,
+  objectives: keyboardTrapObjectives,
 };
 
 const addNewlyPassed = (
@@ -112,13 +116,13 @@ export function battleReducer(state: BattleState, action: BattleAction): BattleS
     case "CODE_RESET":
       return { ...state, phase: "broken-preview", fixture: action.fixture, feed: [...state.feed, "code-reset"] };
     case "NEW_BROKEN_SETUP":
-      return { ...initialBattleState, phase: "broken-preview", fixture: action.fixture, feed: ["entered-preview"] };
+      return { ...initialBattleState, phase: "broken-preview", fixture: action.fixture, objectives: action.objectives ?? state.objectives, feed: ["entered-preview"] };
     case "BEGIN_VERIFICATION":
       return { ...state, phase: "verifying", lastHit: null, feed: [...state.feed, "verification-started"] };
     case "RESULTS": {
       const newlyPassedObjectiveIds = newlyPassed(state.verifiedObjectiveIds, action.result.objectives);
       const verifiedObjectiveIds = addNewlyPassed(state.verifiedObjectiveIds, action.result.objectives);
-      const won = missionComplete(verifiedObjectiveIds);
+      const won = missionComplete(verifiedObjectiveIds, state.objectives);
       const anyPassed = verifiedObjectiveIds.length > 0;
       const phase: MissionPhase = won ? "victory" : anyPassed ? "partial-success" : "failure";
       const outcome: FeedCode = won
@@ -126,15 +130,15 @@ export function battleReducer(state: BattleState, action: BattleAction): BattleS
         : anyPassed
           ? "verification-partial"
           : "verification-failed";
-      const damage = damageForObjectives(newlyPassedObjectiveIds);
-      const xp = xpForObjectives(newlyPassedObjectiveIds);
+      const damage = damageForObjectives(newlyPassedObjectiveIds, state.objectives);
+      const xp = xpForObjectives(newlyPassedObjectiveIds, state.objectives);
       const combo = newlyPassedObjectiveIds.length > 0 ? state.combo + newlyPassedObjectiveIds.length : 0;
       const attempts = state.history.length + 1;
       return {
         ...state,
         results: action.result.objectives,
         verifiedObjectiveIds,
-        hp: bossHealthForVerifiedObjectives(verifiedObjectiveIds),
+        hp: bossHealthForVerifiedObjectives(verifiedObjectiveIds, state.objectives),
         phase,
         attempt: state.attempt + 1,
         history: [...state.history, action.result],
@@ -158,6 +162,6 @@ export function battleReducer(state: BattleState, action: BattleAction): BattleS
     case "SHOW_DEBRIEF":
       return state.phase === "victory" ? { ...state, phase: "debrief" } : state;
     case "REPLAY":
-      return initialBattleState;
+      return { ...initialBattleState, objectives: action.objectives ?? state.objectives };
   }
 }

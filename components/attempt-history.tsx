@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { keyboardTrapObjectives, type VerificationResult } from "@/lib/domain/mission";
+import type { VerificationResult } from "@/lib/domain/mission";
 import type { MissionDictionary } from "@/lib/i18n/dictionaries";
 
 export function AttemptHistory({
@@ -34,7 +34,7 @@ export function AttemptHistory({
             key={entry.attempt.number}
             onClick={() => onSelectAttempt(entry.attempt.number)}
           >
-            {copy.attempt(entry.attempt.number)} · {entry.objectives.filter((objective) => objective.status === "passed").length}/{keyboardTrapObjectives.length}
+            {copy.attempt(entry.attempt.number)} · {entry.objectives.filter((objective) => objective.status === "passed").length}/{entry.objectives.length}
           </button>
         ))}
       </div>
@@ -48,7 +48,7 @@ export function AttemptHistory({
         />
         <figcaption>
           <strong>{copy.snapshotHeading}</strong>
-          <span>{copy.metadata(selected.attempt.number, selected.snapshot.locale, passed, selected.snapshot.capturedAt)}</span>
+          <span>{copy.metadata(selected.attempt.number, selected.snapshot.locale, passed, selected.objectives.length, selected.snapshot.capturedAt)}</span>
           <span>{copy.region}: {selected.snapshot.regionTestId}</span>
         </figcaption>
       </figure>

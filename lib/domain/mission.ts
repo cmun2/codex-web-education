@@ -1,9 +1,14 @@
 export type MissionObjectiveId = "identity" | "focus" | "keyboard" | "layout";
+export type MissionScenarioId = "delete-dialog" | "checkout-sheet";
 export type ObjectiveStatus = "pending" | "passed" | "failed";
 
 export type DialogRole = "none" | "dialog";
 export type DialogReference = "none" | "dialog-title" | "dialog-description";
-export type DialogActionLayout = "overlap" | "flex-row";
+export type DialogActionDisplay = "grid" | "flex";
+export type DialogFlexDirection = "column" | "row";
+export type DialogAlignItems = "stretch" | "center";
+export type DialogJustifyContent = "flex-start" | "flex-end" | "space-between";
+export type DialogGap = 0 | 8 | 16;
 
 export type DialogCodeState = {
   dialogRole: DialogRole;
@@ -13,7 +18,11 @@ export type DialogCodeState = {
   escapeCloses: boolean;
   focusContainment: boolean;
   focusRestoration: boolean;
-  actionLayout: DialogActionLayout;
+  actionDisplay: DialogActionDisplay;
+  actionDirection: DialogFlexDirection;
+  actionAlign: DialogAlignItems;
+  actionJustify: DialogJustifyContent;
+  actionGap: DialogGap;
 };
 
 export type MissionObjective = {
@@ -47,6 +56,7 @@ export type SnapshotEvidence = {
   locale: "ko" | "en";
   capturedAt: string;
   regionTestId: "mission-fixture";
+  scenarioId: MissionScenarioId;
   dimensions: { width: number; height: number };
   codeState: DialogCodeState;
   objectiveResults: ObjectiveResult[];
@@ -55,6 +65,7 @@ export type SnapshotEvidence = {
 
 export type MissionAttempt = {
   number: number;
+  scenarioId: MissionScenarioId;
   codeState: DialogCodeState;
 };
 

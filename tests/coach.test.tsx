@@ -42,6 +42,7 @@ const ollamaResponse = (content: unknown): Response => new Response(JSON.stringi
 describe("coach input boundary", () => {
   it("accepts only sanitized mission context and rejects prompt, command, path, repository, source, and credential fields", () => {
     expect(validateCoachInput(validInput()).ok).toBe(true);
+    expect(validateCoachInput({ ...validInput(), missionId: "flex-tangle" })).toMatchObject({ ok: true, value: { missionId: "flex-tangle" } });
     const forbiddenFields = ["prompt", "shellCommand", "filePath", "repository", "source", "credentials"];
     for (const field of forbiddenFields) {
       expect(validateCoachInput({ ...validInput(), [field]: "DO_NOT_EXPOSE" })).toEqual({

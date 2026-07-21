@@ -1,9 +1,10 @@
-import type { DialogCodeState, ObjectiveResult, SnapshotEvidence } from "@/lib/domain/mission";
+import type { DialogCodeState, MissionScenarioId, ObjectiveResult, SnapshotEvidence } from "@/lib/domain/mission";
 
 export type SnapshotCaptureInput = {
   root: HTMLElement;
   attemptNumber: number;
   locale: "ko" | "en";
+  scenarioId: MissionScenarioId;
   codeState: DialogCodeState;
   objectiveResults: ObjectiveResult[];
   now?: () => Date;
@@ -39,6 +40,7 @@ export function captureSnapshotEvidence(input: SnapshotCaptureInput): SnapshotEv
     locale: input.locale,
     capturedAt: (input.now ?? (() => new Date()))().toISOString(),
     regionTestId: "mission-fixture",
+    scenarioId: input.scenarioId,
     dimensions: { width, height },
     codeState: { ...input.codeState },
     objectiveResults: input.objectiveResults.map((result) => ({

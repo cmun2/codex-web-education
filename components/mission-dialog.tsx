@@ -3,6 +3,7 @@
 import { useLayoutEffect, useRef, type KeyboardEvent } from "react";
 import type { DialogCodeState } from "@/lib/domain/mission";
 import type { MissionDictionary } from "@/lib/i18n/dictionaries";
+import { isActionLayoutRepaired } from "@/lib/mission/code-lab";
 
 type MissionDialogProps = {
   codeState: DialogCodeState;
@@ -50,7 +51,7 @@ export function MissionDialog({ codeState, copy, open, onOpenChange, onPrimary }
     codeState.ariaDescribedBy === "dialog-description";
   const focusReady = codeState.focusContainment;
   const keyboardReady = codeState.escapeCloses && codeState.focusRestoration;
-  const layoutReady = codeState.actionLayout === "flex-row";
+  const layoutReady = isActionLayoutRepaired(codeState);
   const signalStates = [
     { id: "identity", ready: identityReady },
     { id: "focus", ready: focusReady },
@@ -66,7 +67,11 @@ export function MissionDialog({ codeState, copy, open, onOpenChange, onPrimary }
           !codeState.escapeCloses &&
           !codeState.focusContainment &&
           !codeState.focusRestoration &&
-          codeState.actionLayout === "overlap"
+          codeState.actionDisplay === "grid" &&
+          codeState.actionDirection === "column" &&
+          codeState.actionAlign === "stretch" &&
+          codeState.actionJustify === "flex-start" &&
+          codeState.actionGap === 0
         ? "broken"
         : "modified";
 
@@ -124,9 +129,15 @@ export function MissionDialog({ codeState, copy, open, onOpenChange, onPrimary }
             <h3 id="dialog-title">{copy.dialogTitle}</h3>
             <p id="dialog-description">{copy.dialogDescription}</p>
             <div
-              className={`dialog-actions ${layoutReady ? "is-flex-row" : "is-overlap"}`}
+              className={`dialog-actions ${layoutReady ? "is-flex-row" : "has-layout-defect"} ${codeState.actionDisplay === "grid" ? "is-grid-defect" : ""}`}
               data-dialog-actions
-              style={layoutReady ? { display: "flex", flexDirection: "row", gap: "8px" } : { display: "grid" }}
+              style={{
+                display: codeState.actionDisplay,
+                flexDirection: codeState.actionDirection,
+                alignItems: codeState.actionAlign,
+                justifyContent: codeState.actionJustify,
+                gap: `${codeState.actionGap}px`,
+              }}
             >
               <button ref={closeRef} data-action="close" type="button" onClick={closeDialog}>
                 {copy.close}

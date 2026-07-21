@@ -9,7 +9,27 @@ const captureBrowserErrors = (page: Page): string[] => {
 
 const enterEnglishMission = async (page: Page) => {
   await page.getByRole("button", { name: "English" }).click();
-  await page.getByRole("button", { name: "Start Mission" }).click();
+  await page.getByRole("button", { name: /Start selected mission/ }).click();
+};
+
+const repairCss = async (page: Page) => {
+  await page.getByRole("tab", { name: "CSS layout" }).click();
+  await page.getByLabel("display").selectOption("flex");
+  await page.getByLabel("flex-direction").selectOption("row");
+  await page.getByLabel("align-items").selectOption("center");
+  await page.getByLabel("justify-content").selectOption("flex-end");
+  await page.getByLabel("gap").selectOption("16");
+};
+
+const repairAccessibility = async (page: Page) => {
+  await page.getByRole("tab", { name: "Accessibility & keyboard" }).click();
+  await page.getByLabel("Dialog role").selectOption("dialog");
+  await page.getByLabel("Use aria-modal").check();
+  await page.getByLabel("aria-labelledby").selectOption("dialog-title");
+  await page.getByLabel("aria-describedby").selectOption("dialog-description");
+  await page.getByLabel("Close on Escape").check();
+  await page.getByLabel("Contain focus").check();
+  await page.getByLabel("Restore focus").check();
 };
 
 test.beforeEach(async ({ page }) => {
@@ -22,7 +42,7 @@ test("start opens the concrete workspace and settings update preview and source 
   const browserErrors = captureBrowserErrors(page);
   await enterEnglishMission(page);
 
-  await expect(page.getByRole("heading", { name: "Keyboard Trap Boss" })).toBeFocused();
+  await expect(page.getByRole("heading", { name: "Keyboard Trap" })).toBeFocused();
   await expect(page.getByRole("heading", { name: "Delete saved delivery address" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Enter broken preview" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Apply Changes" })).toHaveCount(0);
@@ -38,6 +58,25 @@ test("start opens the concrete workspace and settings update preview and source 
   await expect(page.getByTestId("mission-dialog")).toHaveAttribute("role", "dialog");
   await expect(page.getByRole("heading", { name: "Delete this address?" })).toBeVisible();
   expect(browserErrors).toEqual([]);
+});
+
+test("mission picker starts a distinct Flex Tangle scenario and victory swaps to its defeated boss", async ({ page }) => {
+  await page.getByRole("button", { name: "English" }).click();
+  await page.getByRole("button", { name: "Select Flex Tangle mission" }).click();
+  await page.getByRole("button", { name: /Start selected mission: Flex Tangle/ }).click();
+  await expect(page.getByRole("heading", { name: "Flex Tangle" })).toBeFocused();
+  await expect(page.getByRole("heading", { name: "Change delivery method" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Change delivery method" })).toBeVisible();
+  await expect(page.locator(".boss img")).toHaveAttribute("src", /flex-tangle-alive/);
+  await expect(page.getByTestId("verified-xp")).toHaveText("0 / 300 XP");
+
+  await repairAccessibility(page);
+  await repairCss(page);
+  await expect(page.getByTestId("verified-xp")).toHaveText("0 / 300 XP");
+  await page.getByRole("button", { name: "Check & attack" }).click();
+  await expect(page.getByTestId("verified-xp")).toHaveText("300 / 300 XP");
+  await expect(page.locator(".boss img")).toHaveAttribute("src", /flex-tangle-defeated/);
+  await expect(page.getByRole("heading", { name: "Boss Defeated" })).toBeFocused();
 });
 
 test("damage comes only from newly passed real browser checks", async ({ page }) => {
@@ -58,7 +97,7 @@ test("damage comes only from newly passed real browser checks", async ({ page })
   await page.getByLabel("Close on Escape").check();
   await page.getByLabel("Contain focus").check();
   await page.getByLabel("Restore focus").check();
-  await page.getByLabel("Action-button CSS layout").selectOption("flex-row");
+  await repairCss(page);
   await expect(page.getByTestId("boss-hp")).toHaveText("75");
   await attack.click();
   await expect(page.getByTestId("boss-hp")).toHaveText("0");
@@ -81,18 +120,19 @@ test("new broken setup is deterministic and clears stale battle, evidence, and c
   await expect(page.getByLabel("Contain focus")).toBeChecked();
 
   await page.getByRole("button", { name: "New broken setup" }).click();
-  await expect(page.getByText("Collapsed button layout", { exact: true })).toBeVisible();
-  await expect(page.getByLabel("Action-button CSS layout")).toHaveValue("overlap");
+  await expect(page.getByText("All button CSS broken", { exact: true })).toBeVisible();
+  await page.getByRole("tab", { name: "CSS layout" }).click();
+  await expect(page.getByLabel("display")).toHaveValue("grid");
   await page.getByRole("button", { name: "New broken setup" }).click();
-  await expect(page.getByText("Cannot close and return", { exact: true })).toBeVisible();
-  await expect(page.getByLabel("Close on Escape")).not.toBeChecked();
+  await expect(page.getByText("Vertical actions", { exact: true })).toBeVisible();
+  await expect(page.getByLabel("flex-direction")).toHaveValue("column");
 });
 
 test("a visible flex-layout defect is verified and its AI hint points back to the CSS control", async ({ page }) => {
   await enterEnglishMission(page);
   await page.getByRole("button", { name: "New broken setup" }).click();
   await page.getByRole("button", { name: "New broken setup" }).click();
-  await expect(page.getByText("Collapsed button layout", { exact: true })).toBeVisible();
+  await expect(page.getByText("All button CSS broken", { exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: "Delete address" }).click();
   const actions = page.locator("[data-dialog-actions]");
@@ -103,11 +143,18 @@ test("a visible flex-layout defect is verified and its AI hint points back to th
   await page.getByRole("button", { name: "Check & attack" }).click();
   await expect(page.getByTestId("boss-hp")).toHaveText("25");
   await page.getByRole("button", { name: "Why did this fail? Get a hint" }).click();
-  const layoutControl = page.getByLabel("Action-button CSS layout");
+  await page.getByRole("tab", { name: /CSS layout/ }).click();
+  const layoutControl = page.getByLabel("display");
   await expect(layoutControl.locator("xpath=..")).toHaveClass(/ai-highlight/);
-  await expect(page.getByRole("button", { name: /Why AI recommends this setting/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Why AI recommends this setting/ }).first()).toBeVisible();
 
-  await layoutControl.selectOption("flex-row");
+  await layoutControl.selectOption("flex");
+  await expect(page.getByText("Visual observation", { exact: true })).toHaveCount(0);
+  await expect(page.locator(".repair-control.ai-highlight")).toHaveCount(4);
+  await page.getByLabel("flex-direction").selectOption("row");
+  await page.getByLabel("align-items").selectOption("center");
+  await page.getByLabel("justify-content").selectOption("flex-end");
+  await page.getByLabel("gap").selectOption("16");
   await page.getByRole("button", { name: "Delete address" }).click();
   await expect(actions).toHaveCSS("display", "flex");
   await expect(actions).toHaveCSS("flex-direction", "row");
@@ -126,12 +173,15 @@ test("coach is absent until a failed verification and reveals one requested hint
   await expect(page.getByText("Demo Coach", { exact: true })).not.toBeVisible();
   await page.getByText("Hint technical details", { exact: true }).click();
   await expect(page.getByText("Demo Coach", { exact: true })).toBeVisible();
-  await expect(page.locator(".repair-control.ai-highlight")).toHaveCount(4);
+  await expect(page.locator(".repair-control.ai-highlight")).toHaveCount(12);
+  await expect(page.getByRole("tab", { name: /CSS layout/ })).toHaveClass(/ai-tab-highlight/);
   await expect(page.getByRole("button", { name: /Why AI recommends this setting/ }).first()).toBeVisible();
 
   await page.getByLabel("Dialog role").selectOption("dialog");
   await expect(page.getByText("Visual observation", { exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Why did this fail? Get a hint" })).toHaveCount(0);
+  await expect(page.locator(".repair-control.ai-highlight")).toHaveCount(11);
+  await expect(page.getByRole("tab", { name: /CSS layout/ })).toHaveClass(/ai-tab-highlight/);
   await page.getByRole("button", { name: "Check & attack" }).click();
   await expect(page.getByRole("button", { name: "Why did this fail? Get a hint" })).toBeVisible();
 });
@@ -142,7 +192,7 @@ test("replay is clean and Korean mobile keeps preview then controls without over
   await page.reload();
   await expect(page.locator("html")).toHaveAttribute("lang", "ko");
   await expect(page.getByRole("button", { name: "한국어" })).toHaveAttribute("aria-pressed", "true");
-  await page.getByRole("button", { name: "미션 시작" }).click();
+  await page.getByRole("button", { name: /선택한 미션 시작/ }).click();
   await expect(page.getByRole("heading", { name: "저장된 배송지 삭제" })).toBeVisible();
   await expect(page.getByRole("button", { name: "검사하고 공격" })).toBeVisible();
   await expect(page.getByRole("button", { name: "변경 사항 적용" })).toHaveCount(0);
@@ -158,15 +208,25 @@ test("replay is clean and Korean mobile keeps preview then controls without over
   await page.getByLabel("Escape로 닫기").check();
   await page.getByLabel("포커스 순환").check();
   await page.getByLabel("포커스 복귀").check();
-  await page.getByLabel("동작 버튼 CSS 배치").selectOption("flex-row");
+  await page.getByRole("tab", { name: "CSS 배치" }).click();
+  await page.getByLabel("display").selectOption("flex");
+  await page.getByLabel("flex-direction").selectOption("row");
+  await page.getByLabel("align-items").selectOption("center");
+  await page.getByLabel("justify-content").selectOption("flex-end");
+  await page.getByLabel("gap").selectOption("16");
   await page.getByRole("button", { name: "검사하고 공격" }).click();
   await page.getByRole("button", { name: "미션 다시 플레이" }).first().click();
-  await expect(page.getByRole("button", { name: "미션 시작" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /선택한 미션 시작/ })).toBeVisible();
 });
 
 test("keyboard-only dialog flow and reduced-motion styles remain available", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await enterEnglishMission(page);
+  const accessibilityTab = page.getByRole("tab", { name: "Accessibility & keyboard" });
+  await accessibilityTab.focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(page.getByRole("tab", { name: "CSS layout" })).toBeFocused();
+  await expect(page.getByRole("tab", { name: "CSS layout" })).toHaveAttribute("aria-selected", "true");
   const trigger = page.getByRole("button", { name: "Delete address" });
   await trigger.focus();
   await page.keyboard.press("Enter");
@@ -186,7 +246,7 @@ test("language and mute preferences persist while sound remains optional", async
   await expect(page.locator("html")).toHaveAttribute("lang", "en");
   await expect(page.getByRole("button", { name: "English" })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByRole("button", { name: "Battle sound muted. Turn sound on" })).toBeVisible();
-  await page.getByRole("button", { name: "Start Mission" }).click();
+  await page.getByRole("button", { name: /Start selected mission/ }).click();
   await expect(page.getByRole("button", { name: "Check & attack" })).toBeVisible();
   expect(browserErrors).toEqual([]);
 });
@@ -194,14 +254,8 @@ test("language and mute preferences persist while sound remains optional", async
 test("first-attempt repair preserves evidence and diff, ranks S, and replay does not duplicate XP", async ({ page }) => {
   const browserErrors = captureBrowserErrors(page);
   await enterEnglishMission(page);
-  await page.getByLabel("Dialog role").selectOption("dialog");
-  await page.getByLabel("Use aria-modal").check();
-  await page.getByLabel("aria-labelledby").selectOption("dialog-title");
-  await page.getByLabel("aria-describedby").selectOption("dialog-description");
-  await page.getByLabel("Close on Escape").check();
-  await page.getByLabel("Contain focus").check();
-  await page.getByLabel("Restore focus").check();
-  await page.getByLabel("Action-button CSS layout").selectOption("flex-row");
+  await repairAccessibility(page);
+  await repairCss(page);
   await page.getByRole("button", { name: "Check & attack" }).click();
 
   await expect(page.getByRole("heading", { name: "Boss Defeated" })).toBeFocused();
@@ -209,7 +263,7 @@ test("first-attempt repair preserves evidence and diff, ranks S, and replay does
   await expect(page.getByText("Mission rank S", { exact: true })).toBeVisible();
   await page.getByText("Attempt history & snapshot evidence", { exact: true }).click();
   await expect(page.getByRole("button", { name: "Attempt 1 · 4/4" })).toBeVisible();
-  await expect(page.getByRole("img", { name: "Delete-dialog snapshot for attempt 1" })).toBeVisible();
+  await expect(page.getByRole("img", { name: "UI snapshot for attempt 1" })).toBeVisible();
   await expect(page.getByText(/Attempt 1 · en · 4\/4 passed/)).toBeVisible();
   await expect(page.getByText("Why save this view?", { exact: true })).toBeVisible();
   await expect(page.getByText("Captured region: mission-fixture", { exact: true })).toBeVisible();
@@ -226,7 +280,7 @@ test("first-attempt repair preserves evidence and diff, ranks S, and replay does
     return typeof parsed === "object" && parsed !== null && "totalXp" in parsed ? parsed.totalXp : null;
   })).toBe(300);
   await page.getByRole("button", { name: "Replay mission" }).first().click();
-  await expect(page.getByRole("button", { name: "Start Mission" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Start selected mission/ })).toBeVisible();
   const storedXp = await page.evaluate(() => {
     const raw = window.localStorage.getItem("frontend-debugging-arena-progression-v1");
     if (raw === null) return null;
@@ -246,7 +300,7 @@ test("storage fallback remains usable", async ({ page }) => {
   await expect(page.getByRole("status")).toContainText("Browser storage is unavailable");
   await page.getByRole("button", { name: "Battle sound on. Mute sound" }).click();
   await expect(page.getByRole("button", { name: "Battle sound muted. Turn sound on" })).toBeVisible();
-  await page.getByRole("button", { name: "Start Mission" }).click();
+  await page.getByRole("button", { name: /Start selected mission/ }).click();
   await expect(page.getByRole("button", { name: "Check & attack" })).toBeVisible();
 });
 
@@ -254,7 +308,7 @@ test.describe("Korean browser default", () => {
   test.use({ locale: "ko-KR" });
   test("defaults to Korean", async ({ page }) => {
     await page.goto("/");
-    await expect(page.getByRole("button", { name: "미션 시작" })).toBeVisible();
+    await expect(page.getByRole("button", { name: /선택한 미션 시작/ })).toBeVisible();
     await expect(page.locator("html")).toHaveAttribute("lang", "ko");
   });
 });

@@ -1,30 +1,31 @@
 "use client";
 
 import { useEffect, useReducer, useRef, useState, useSyncExternalStore } from "react";
+import Image from "next/image";
 import { AttemptHistory } from "@/components/attempt-history";
 import { CodeLabPanel } from "@/components/code-lab";
 import { MissionDialog } from "@/components/mission-dialog";
 import { VisualCoach } from "@/components/visual-coach";
 import { battleReducer, initialBattleState, type MissionPhase } from "@/lib/domain/battle";
-import { keyboardTrapObjectives, type MissionObjectiveId, type ObjectiveResult, type ObjectiveStatus, type VerificationResult } from "@/lib/domain/mission";
-import { coachMissionId, type CoachInsight } from "@/lib/domain/providers";
+import { keyboardTrapObjectives, type MissionObjectiveId, type MissionScenarioId, type ObjectiveResult, type ObjectiveStatus, type VerificationResult } from "@/lib/domain/mission";
+import { type CoachInsight } from "@/lib/domain/providers";
 import { dictionaries, statusLabel, type Locale, type MissionDictionary } from "@/lib/i18n/dictionaries";
 import { getLocaleSnapshot, getServerLocaleSnapshot, selectLocale, subscribeToLocale } from "@/lib/i18n/locale";
 import {
   AllowlistedDialogCodeLab,
-  brokenDialogCode,
   dialogPreset,
   dialogPresets,
   isFullyRepaired,
+  isRepairFieldResolved,
   type DialogPresetId,
   type DialogRepairField,
   type RepairProvider,
 } from "@/lib/mission/code-lab";
 import { DialogObjectiveEvaluator } from "@/lib/mission/evaluator";
+import { missionScenario, missionScenarios } from "@/lib/mission/scenarios";
 import { captureSnapshotEvidence } from "@/lib/mission/snapshot";
 import {
   defaultProgression,
-  keyboardTrapMissionId,
   LocalProgressionStorage,
   type SoundChoice,
   type StoredProgression,
@@ -40,7 +41,7 @@ const repairFieldsForObjective: Record<MissionObjectiveId, readonly DialogRepair
   identity: ["dialogRole", "ariaModal", "ariaLabelledBy", "ariaDescribedBy"],
   focus: ["focusContainment"],
   keyboard: ["escapeCloses", "focusRestoration"],
-  layout: ["actionLayout"],
+  layout: ["actionDisplay", "actionDirection", "actionAlign", "actionJustify", "actionGap"],
 };
 
 function LanguageSwitcher({ locale, copy, onChange }: { locale: Locale; copy: MissionDictionary; onChange: (locale: Locale) => void }) {
@@ -119,8 +120,10 @@ export function MissionRunner() {
   const [coachLoading, setCoachLoading] = useState(false);
   const [coachAvailable, setCoachAvailable] = useState(false);
   const [coachedAttempt, setCoachedAttempt] = useState<number | null>(null);
+  const [guidedObjectiveIds, setGuidedObjectiveIds] = useState<readonly MissionObjectiveId[]>([]);
   const [selectedAttempt, setSelectedAttempt] = useState<number | null>(null);
-  const [codeState, setCodeState] = useState({ ...brokenDialogCode });
+  const [scenarioId, setScenarioId] = useState<MissionScenarioId>("delete-dialog");
+  const [codeState, setCodeState] = useState(dialogPreset("everything-missing"));
   const [presetId, setPresetId] = useState<DialogPresetId>("everything-missing");
   const [validationErrors, setValidationErrors] = useState<readonly string[]>([]);
   const [showDiff, setShowDiff] = useState(false);
@@ -139,6 +142,9 @@ export function MissionRunner() {
   const [progression, setProgression] = useState<StoredProgression>(defaultProgression);
   const [storageAvailable, setStorageAvailable] = useState(true);
   const copy = dictionaries[locale];
+  const scenario = missionScenario(scenarioId);
+  const scenarioCopy = copy.missionCatalog[scenarioId];
+  const fixtureCopy = scenarioId === "delete-dialog" ? copy.fixture : copy.fixtureTwo;
 
   if (progressionStorageRef.current === null) progressionStorageRef.current = new LocalProgressionStorage();
   if (soundPlayerRef.current === null) soundPlayerRef.current = new WebAudioBattleSoundPlayer();
@@ -184,14 +190,14 @@ export function MissionRunner() {
     if (state.phase !== "victory" || completionRecordedRef.current) return;
     completionRecordedRef.current = true;
     const completion = progressionStorageRef.current?.recordCompletion(
-      keyboardTrapMissionId,
+      scenario.storageMissionId,
       state.history.length,
       state.xpEarned,
     );
     if (!completion) return;
     setProgression(completion.value);
     setStorageAvailable(completion.storageAvailable);
-  }, [state.history.length, state.phase, state.xpEarned]);
+  }, [scenario.storageMissionId, state.history.length, state.phase, state.xpEarned]);
 
   const updateCode = (nextCode: typeof codeState) => {
     const validation = repairProvider.apply(nextCode);
@@ -215,6 +221,7 @@ export function MissionRunner() {
     const activeElement = rootRef.current.ownerDocument.activeElement;
     checkReturnFocusRef.current = activeElement instanceof HTMLElement ? activeElement : null;
     setChecking(true);
+    setGuidedObjectiveIds([]);
     dispatch({ type: "BEGIN_VERIFICATION" });
     try {
       const objectiveResults = await objectiveEvaluator.evaluate(rootRef.current);
@@ -223,6 +230,7 @@ export function MissionRunner() {
         root: rootRef.current,
         attemptNumber: state.attempt,
         locale,
+        scenarioId,
         codeState,
         objectiveResults,
       });
@@ -236,7 +244,7 @@ export function MissionRunner() {
       setCoachLoading(false);
       dispatch({
         type: "RESULTS",
-        result: { attempt: { number: state.attempt, codeState: { ...codeState } }, objectives: objectiveResults, snapshot },
+        result: { attempt: { number: state.attempt, scenarioId, codeState: { ...codeState } }, objectives: objectiveResults, snapshot },
       });
     } finally {
       setChecking(false);
@@ -253,6 +261,7 @@ export function MissionRunner() {
     setCoachLoading(false);
     setCoachedAttempt(null);
     setCoachAvailable(false);
+    setGuidedObjectiveIds([]);
     coachRequestRef.current += 1;
     dispatch({ type: "CODE_RESET", fixture: presetId === "everything-missing" ? "broken" : "modified" });
   };
@@ -270,21 +279,24 @@ export function MissionRunner() {
     setCoachLoading(false);
     setCoachedAttempt(null);
     setCoachAvailable(false);
+    setGuidedObjectiveIds([]);
     setSelectedAttempt(null);
     coachRequestRef.current += 1;
     completionRecordedRef.current = false;
     dispatch({ type: "NEW_BROKEN_SETUP", fixture: nextPreset.id === "everything-missing" ? "broken" : "modified" });
   };
 
-  const resetMissionUi = () => {
+  const resetMissionUi = (nextScenarioId: MissionScenarioId = scenarioId) => {
+    const nextScenario = missionScenario(nextScenarioId);
     setCoach(null);
     setCoachError(false);
     setCoachLoading(false);
     setCoachedAttempt(null);
     setCoachAvailable(false);
+    setGuidedObjectiveIds([]);
     setSelectedAttempt(null);
-    setCodeState({ ...brokenDialogCode });
-    setPresetId("everything-missing");
+    setCodeState(dialogPreset(nextScenario.initialPresetId));
+    setPresetId(nextScenario.initialPresetId);
     setValidationErrors([]);
     setShowDiff(false);
     setDialogOpen(false);
@@ -293,6 +305,17 @@ export function MissionRunner() {
   };
 
   const replayMission = () => {
+    dispatch({ type: "REPLAY" });
+    resetMissionUi();
+  };
+
+  const startScenario = (nextScenarioId: MissionScenarioId) => {
+    setScenarioId(nextScenarioId);
+    resetMissionUi(nextScenarioId);
+    dispatch({ type: "NEW_BROKEN_SETUP", fixture: "broken" });
+  };
+
+  const chooseMission = () => {
     dispatch({ type: "REPLAY" });
     resetMissionUi();
   };
@@ -306,8 +329,6 @@ export function MissionRunner() {
 
   const selectedVerification: VerificationResult | undefined =
     state.history.find((entry) => entry.attempt.number === selectedAttempt) ?? state.history[state.history.length - 1];
-  const hintedObjectiveId = selectedVerification?.objectives.find((result) => result.status === "failed")?.objectiveId;
-
   const askCoach = async () => {
     if (!selectedVerification || coachLoading) return;
     const requestId = coachRequestRef.current + 1;
@@ -319,7 +340,7 @@ export function MissionRunner() {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          missionId: coachMissionId,
+          missionId: scenario.coachMissionId,
           failedObjectiveIds: selectedVerification.objectives
             .filter((result) => result.status === "failed")
             .map((result) => result.objectiveId),
@@ -370,6 +391,7 @@ export function MissionRunner() {
         usedFallback: candidate.usedFallback,
         hintLevel: candidate.hintLevel,
       });
+      setGuidedObjectiveIds(selectedVerification.objectives.filter((result) => result.status === "failed").map((result) => result.objectiveId));
       setCoachedAttempt(selectedVerification.attempt.number);
     } catch {
       if (coachRequestRef.current === requestId) setCoachError(true);
@@ -379,6 +401,9 @@ export function MissionRunner() {
   };
 
   const passedCount = state.verifiedObjectiveIds.length;
+  const highlightedFields = guidedObjectiveIds
+    .flatMap((objectiveId) => repairFieldsForObjective[objectiveId])
+    .filter((field, index, fields) => !isRepairFieldResolved(codeState, field) && fields.indexOf(field) === index);
   return (
     <main ref={rootRef} className="arena">
       <div className="topbar">
@@ -397,14 +422,25 @@ export function MissionRunner() {
       {state.phase === "landing" && (
         <div className="landing-shell">
           <header className="hero">
-            <p className="eyebrow">{copy.product.mission}</p>
+            <p className="eyebrow">{copy.product.workingTitle}</p>
             <h1 ref={phaseHeadingRef} tabIndex={-1}>{copy.landing.heading}</h1>
             <p className="proposition">{copy.product.proposition}</p>
             <p className="lead">{copy.landing.body}</p>
+            <div className="mission-picker" aria-label={copy.landing.heading}>
+              {missionScenarios.map((candidate) => {
+                const candidateCopy = copy.missionCatalog[candidate.id];
+                return (
+                  <button key={candidate.id} type="button" aria-pressed={scenarioId === candidate.id} aria-label={candidateCopy.select} onClick={() => setScenarioId(candidate.id)}>
+                    <Image src={candidate.bossAliveSrc} width={112} height={112} alt="" aria-hidden="true" />
+                    <span><small>{candidateCopy.label}</small><strong>{candidateCopy.title}</strong><span>{candidateCopy.summary}</span></span>
+                  </button>
+                );
+              })}
+            </div>
             <div className="fresh-status" aria-label={copy.mission.status}>
               <span>{copy.mission.hp(state.hp)}</span><span>{copy.mission.objectivesProgress(0)}</span><span>{copy.progression.totalXp(progression.totalXp)}</span>
             </div>
-            <button className="primary-action start-action" type="button" onClick={() => dispatch({ type: "START_MISSION" })}>{copy.landing.start}</button>
+            <button className="primary-action start-action" type="button" onClick={() => startScenario(scenarioId)}>{copy.landing.start}: {scenarioCopy.title}</button>
           </header>
           <MissionLoop copy={copy} />
         </div>
@@ -413,7 +449,7 @@ export function MissionRunner() {
       {isActivePhase(state.phase) && (
         <>
           <header className="mission-header">
-            <div><p className="eyebrow">{copy.product.mission}</p><h1 ref={phaseHeadingRef} tabIndex={-1}>{copy.briefing.heading}</h1></div>
+            <div><p className="eyebrow">{scenarioCopy.label}</p><h1 ref={phaseHeadingRef} tabIndex={-1}>{scenarioCopy.title}</h1></div>
             <p className="compact-proposition">{copy.product.proposition}</p>
           </header>
           <div className="status-strip" aria-label={copy.mission.status}>
@@ -422,10 +458,13 @@ export function MissionRunner() {
 
           <div className="direct-workspace">
             <div className="fixture-stage">
-              <MissionDialog codeState={codeState} copy={copy.fixture} open={dialogOpen} onOpenChange={setDialogOpen} onPrimary={() => undefined} />
+              <MissionDialog codeState={codeState} copy={fixtureCopy} open={dialogOpen} onOpenChange={setDialogOpen} onPrimary={() => undefined} />
               <section className="battle battle-perched" aria-labelledby="battle-heading">
                 <h2 id="battle-heading" className="sr-only">{copy.mission.heading}</h2>
-                <div key={state.lastHit?.attempt ?? 0} className={`boss ${state.lastHit ? "boss-hit" : ""}`} role="img" aria-label={copy.mission.bossLabel}><span aria-hidden="true">⌘</span><div className="eye left" /><div className="eye right" /><p>{copy.mission.bossLabel}</p></div>
+                <div key={`${scenarioId}-${state.lastHit?.attempt ?? 0}`} className={`boss ${state.lastHit ? "boss-hit" : ""} ${state.phase === "victory" ? "boss-defeated" : ""}`} role="img" aria-label={scenarioCopy.bossLabel}>
+                  <Image src={state.phase === "victory" ? scenario.bossDefeatedSrc : scenario.bossAliveSrc} width={180} height={180} alt="" priority />
+                  <p>{scenarioCopy.bossLabel}</p>
+                </div>
                 <div className="boss-meter">
                   <div className="health" aria-hidden="true"><div style={{ width: `${state.hp}%` }} /></div>
                   <p className="hp-copy" aria-label={copy.mission.hp(state.hp)}><strong data-testid="boss-hp">{state.hp}</strong> / 100</p>
@@ -442,13 +481,15 @@ export function MissionRunner() {
                 copy={copy.codeLab}
                 value={codeState}
                 presetId={presetId}
-                source={repairProvider.source(codeState)}
-                diff={repairProvider.diff(codeState)}
+                source={repairProvider.source(codeState, scenario.sourceFunctionName)}
+                diff={repairProvider.diff(codeState, dialogPreset(presetId), scenario.sourceFunctionName)}
                 showDiff={showDiff}
                 validationErrors={validationErrors}
                 checking={checking}
-                highlightedFields={coach && hintedObjectiveId ? repairFieldsForObjective[hintedObjectiveId] : []}
-                aiHint={coach?.hint ?? null}
+                highlightedFields={highlightedFields}
+                aiHint={highlightedFields.length > 0 ? copy.codeLab.remainingAiHint : null}
+                verifiedCount={passedCount}
+                verifiedXp={state.xpEarned}
                 onChange={updateCode}
                 onNewSetup={loadNextPreset}
                 onRunChecks={runChecks}
@@ -514,14 +555,10 @@ export function MissionRunner() {
                 </div>
                 <div className="action-row">
                   <button className="primary-action" type="button" onClick={replayMission}>{copy.actions.replay}</button>
+                  {scenarioId === "delete-dialog" && <button className="primary-action" type="button" onClick={() => startScenario("checkout-sheet")}>{copy.actions.nextMission}</button>}
                   <button className="secondary-action" type="button" onClick={() => dispatch({ type: "SHOW_DEBRIEF" })}>{copy.actions.seeDebrief}</button>
+                  <button className="text-action" type="button" onClick={chooseMission}>{copy.actions.missionMenu}</button>
                 </div>
-                <aside className="future-mission" aria-label={copy.progression.teaserLabel}>
-                  <p className="eyebrow">{copy.progression.teaserLabel}</p>
-                  <h3>{copy.progression.teaserTitle}</h3>
-                  <p>{copy.progression.teaserBody}</p>
-                  <span aria-disabled="true">{copy.progression.unavailable}</span>
-                </aside>
               </section>
             )}
           </section>
@@ -534,9 +571,7 @@ export function MissionRunner() {
           <div className="debrief-grid"><div><h2>{copy.debrief.semanticsHeading}</h2><p>{copy.debrief.semantics}</p></div><div><h2>{copy.debrief.behaviorHeading}</h2><p>{copy.debrief.behavior}</p></div></div>
           <div className="debrief-score"><span>{copy.mission.hp(state.hp)}</span><span>{copy.mission.objectivesProgress(passedCount)}</span></div>
           <button className="primary-action" type="button" onClick={replayMission}>{copy.actions.replay}</button>
-          <aside className="future-mission" aria-label={copy.progression.teaserLabel}>
-            <p className="eyebrow">{copy.progression.teaserLabel}</p><h2>{copy.progression.teaserTitle}</h2><p>{copy.progression.teaserBody}</p><span aria-disabled="true">{copy.progression.unavailable}</span>
-          </aside>
+          <button className="secondary-action" type="button" onClick={chooseMission}>{copy.actions.missionMenu}</button>
         </section>
       )}
     </main>

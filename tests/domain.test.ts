@@ -45,6 +45,7 @@ const snapshotFor = (attemptNumber: number, objectives: ObjectiveResult[]): Snap
   locale: "en",
   capturedAt: "2026-07-19T00:00:00.000Z",
   regionTestId: "mission-fixture",
+  scenarioId: "delete-dialog",
   dimensions: { width: 480, height: 440 },
   codeState: { ...repairedDialogCode },
   objectiveResults: objectives,
@@ -52,7 +53,7 @@ const snapshotFor = (attemptNumber: number, objectives: ObjectiveResult[]): Snap
 });
 
 const verification = (attemptNumber: number, objectives: ObjectiveResult[]): VerificationResult => ({
-  attempt: { number: attemptNumber, codeState: { ...repairedDialogCode } },
+  attempt: { number: attemptNumber, scenarioId: "delete-dialog", codeState: { ...repairedDialogCode } },
   objectives,
   snapshot: snapshotFor(attemptNumber, objectives),
 });
@@ -90,7 +91,7 @@ describe("allowlisted Code Lab", () => {
   });
 
   it("keeps every curated broken setup inside the typed allowlist", () => {
-    expect(dialogPresets.map((preset) => preset.id)).toEqual(["everything-missing", "unnamed-modal", "layout-collapse", "keyboard-trap"]);
+    expect(dialogPresets.map((preset) => preset.id)).toEqual(["everything-missing", "unnamed-modal", "layout-collapse", "vertical-actions", "misaligned-actions", "cramped-actions", "keyboard-trap"]);
     for (const preset of dialogPresets) {
       expect(validateDialogCodeState(preset.code)).toEqual({ ok: true, value: preset.code });
     }
@@ -206,13 +207,11 @@ const renderFixture = (codeState: DialogCodeState): HTMLElement => {
     primary.dataset.action = "primary";
     const actions = document.createElement("div");
     actions.dataset.dialogActions = "";
-    if (codeState.actionLayout === "flex-row") {
-      actions.style.display = "flex";
-      actions.style.flexDirection = "row";
-      actions.style.gap = "8px";
-    } else {
-      actions.style.display = "grid";
-    }
+    actions.style.display = codeState.actionDisplay;
+    actions.style.flexDirection = codeState.actionDirection;
+    actions.style.alignItems = codeState.actionAlign;
+    actions.style.justifyContent = codeState.actionJustify;
+    actions.style.gap = `${codeState.actionGap}px`;
     const closeDialog = () => {
       dialog.remove();
       if (codeState.focusRestoration) trigger.focus();
@@ -258,12 +257,13 @@ describe("rendered behavior evaluation and snapshot evidence", () => {
       root,
       attemptNumber: 4,
       locale: "ko",
+      scenarioId: "delete-dialog",
       codeState: repairedDialogCode,
       objectiveResults: objectives,
       now: () => new Date("2026-07-19T09:30:00.000Z"),
     });
     const decoded = decodeURIComponent(snapshot.imageDataUrl);
-    expect(snapshot).toMatchObject({ contract: "fixture-region-v1", attemptNumber: 4, locale: "ko", regionTestId: "mission-fixture", capturedAt: "2026-07-19T09:30:00.000Z" });
+    expect(snapshot).toMatchObject({ contract: "fixture-region-v1", attemptNumber: 4, locale: "ko", scenarioId: "delete-dialog", regionTestId: "mission-fixture", capturedAt: "2026-07-19T09:30:00.000Z" });
     expect(snapshot.codeState).toEqual(repairedDialogCode);
     expect(snapshot.objectiveResults).toEqual(objectives);
     expect(decoded).toContain("Fixture only");

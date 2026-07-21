@@ -76,6 +76,8 @@ export class DialogObjectiveEvaluator implements ObjectiveEvaluator {
     const layout = Boolean(
       actionsStyle?.display === "flex" &&
       actionsStyle.flexDirection === "row" &&
+      actionsStyle.alignItems === "center" &&
+      actionsStyle.justifyContent === "flex-end" &&
       Number.parseFloat(actionsStyle.gap || actionsStyle.columnGap) >= 8,
     );
     const initialFocusInside = Boolean(dialog?.contains(root.ownerDocument.activeElement));

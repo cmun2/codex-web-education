@@ -6,7 +6,11 @@ import type {
 } from "@/lib/domain/mission";
 import { validateDialogCodeState } from "@/lib/mission/code-lab";
 
-export const coachMissionId = "keyboard-trap" as const;
+export const coachMissionIds = ["keyboard-trap", "flex-tangle"] as const;
+export type CoachMissionId = (typeof coachMissionIds)[number];
+export const coachMissionId: CoachMissionId = "keyboard-trap";
+const isCoachMissionId = (value: unknown): value is CoachMissionId =>
+  value === "keyboard-trap" || value === "flex-tangle";
 export const maxCoachImageBytes = 512_000;
 export const maxCoachRequestBytes = 1_750_000;
 
@@ -16,7 +20,7 @@ export type CoachSnapshot = Pick<
 >;
 
 export type CoachInput = {
-  missionId: typeof coachMissionId;
+  missionId: CoachMissionId;
   failedObjectiveIds: readonly MissionObjectiveId[];
   codeState: DialogCodeState;
   snapshot: CoachSnapshot;
@@ -161,7 +165,7 @@ export function validateCoachInput(input: unknown): CoachInputValidation {
   const attemptNumber = read(input, "attemptNumber");
   const locale = read(input, "locale");
 
-  if (missionId !== coachMissionId) return { ok: false, error: "INVALID_MISSION" };
+  if (!isCoachMissionId(missionId)) return { ok: false, error: "INVALID_MISSION" };
   if (!Array.isArray(failedObjectiveIds) || failedObjectiveIds.length < 1 || failedObjectiveIds.length > objectiveIds.length) {
     return { ok: false, error: "INVALID_OBJECTIVES" };
   }
@@ -240,9 +244,9 @@ const copyFor = (
       { observation: "The selected attempt still lacks the full keyboard close-and-return behavior.", hint: "Enable both Escape dismissal and focus restoration, then verify the opener is focused.", whyItMatters: "Dismissal and restoration are one continuous keyboard interaction.", inspectNext: "Open, press Escape, and check the Delete address button for focus.", bossTaunt: "Two steps make the exit—miss either and I win!" },
     ],
     layout: [
-      { observation: "The action buttons visibly collide, and the rendered layout check confirms that the action group is not a flex row.", hint: "Change the action layout to a horizontal flex row.", whyItMatters: "A stable layout keeps destructive and cancel actions readable and separately targetable.", inspectNext: "Inspect display and flex-direction on the action group.", bossTaunt: "Overlapping buttons make every choice risky!" },
+      { observation: "The action buttons visibly collide, and the rendered layout check confirms that the CSS combination is incomplete.", hint: "Open CSS layout and start with the highlighted display setting; the remaining glow will show what is still unresolved.", whyItMatters: "A stable layout keeps destructive and cancel actions readable and separately targetable.", inspectNext: "Inspect display, direction, alignment, placement, and gap on the action group.", bossTaunt: "Overlapping buttons make every choice risky!" },
       { observation: "The action group still fails its rendered CSS contract.", hint: "Use a row direction and leave a visible gap between both buttons.", whyItMatters: "Direction without spacing can still make controls look merged.", inspectNext: "Inspect display, flex-direction, and gap together.", bossTaunt: "No gap, no clarity!" },
-      { observation: "The selected attempt still has a collapsed action layout.", hint: "Set the allowlisted action layout to flex-row, then verify both buttons remain distinct.", whyItMatters: "The browser check must see the final computed flex layout, not just a code-like claim.", inspectNext: "Compare the rendered button group with its computed CSS.", bossTaunt: "Only real rendered CSS can beat this trap!" },
+      { observation: "The selected attempt still has a collapsed action layout.", hint: "Open CSS layout and repair the highlighted display, direction, alignment, placement, and gap values one at a time.", whyItMatters: "The browser check must see the final computed flex layout, not just a code-like claim.", inspectNext: "Compare the rendered button group with each highlighted computed-CSS setting.", bossTaunt: "Only real rendered CSS can beat this trap!" },
     ],
   };
   if (locale === "en") return english[objectiveId][level - 1];
@@ -264,9 +268,9 @@ const copyFor = (
       { observation: "선택한 시도에 완전한 키보드 닫기와 복귀 동작이 아직 없습니다.", hint: "Escape 닫기와 포커스 복귀를 모두 켜고 열기 버튼에 포커스가 오는지 검증하세요.", whyItMatters: "닫기와 복귀는 하나의 연속된 키보드 상호작용입니다.", inspectNext: "열고 Escape를 누른 뒤 배송지 삭제 버튼의 포커스를 확인하세요.", bossTaunt: "탈출은 두 단계야. 하나라도 놓치면 내가 이긴다!" },
     ],
     layout: [
-      { observation: "동작 버튼이 눈에 띄게 겹치고, 렌더된 배치 검사도 버튼 그룹이 flex 행이 아니라고 확인했습니다.", hint: "동작 버튼 배치를 가로 flex 행으로 바꾸세요.", whyItMatters: "안정적인 배치는 삭제와 취소 동작을 읽고 각각 누를 수 있게 합니다.", inspectNext: "동작 그룹의 display와 flex-direction을 확인하세요.", bossTaunt: "겹친 버튼은 모든 선택을 위험하게 만들지!" },
+      { observation: "동작 버튼이 눈에 띄게 겹치고, 렌더된 배치 검사도 CSS 조합이 불완전하다고 확인했습니다.", hint: "CSS 배치 탭에서 표시된 display부터 바꾸세요. 남은 glow가 아직 고칠 값을 보여 줍니다.", whyItMatters: "안정적인 배치는 삭제와 취소 동작을 읽고 각각 누를 수 있게 합니다.", inspectNext: "동작 그룹의 display, 방향, 정렬, 배치, gap을 확인하세요.", bossTaunt: "겹친 버튼은 모든 선택을 위험하게 만들지!" },
       { observation: "동작 그룹이 아직 렌더된 CSS 계약을 통과하지 못했습니다.", hint: "row 방향을 사용하고 두 버튼 사이에 눈에 보이는 간격을 두세요.", whyItMatters: "방향만 맞아도 간격이 없으면 컨트롤이 하나처럼 보일 수 있습니다.", inspectNext: "display, flex-direction, gap을 함께 확인하세요.", bossTaunt: "간격이 없으면 구분도 없다!" },
-      { observation: "선택한 시도의 동작 버튼 배치가 여전히 무너져 있습니다.", hint: "허용된 동작 배치를 flex-row로 설정한 뒤 두 버튼이 분리돼 보이는지 검증하세요.", whyItMatters: "코드 설명이 아니라 브라우저의 최종 계산 배치가 검사를 통과해야 합니다.", inspectNext: "렌더된 버튼 그룹과 계산된 CSS를 비교하세요.", bossTaunt: "진짜 렌더된 CSS만이 이 함정을 이길 수 있지!" },
+      { observation: "선택한 시도의 동작 버튼 배치가 여전히 무너져 있습니다.", hint: "CSS 배치 탭에서 표시된 display, 방향, 정렬, 배치, gap 값을 하나씩 고치세요.", whyItMatters: "코드 설명이 아니라 브라우저의 최종 계산 배치가 검사를 통과해야 합니다.", inspectNext: "렌더된 버튼 그룹과 표시된 계산 CSS 설정을 하나씩 비교하세요.", bossTaunt: "진짜 렌더된 CSS만이 이 함정을 이길 수 있지!" },
     ],
   };
   return korean[objectiveId][level - 1];

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { battleReducer, initialBattleState, rankForAttempts } from "@/lib/domain/battle";
 import {
   bossHealth,
+  keyboardTrapObjectives,
   missionComplete,
   xpForObjectives,
   type DialogCodeState,
@@ -22,13 +23,16 @@ import {
 import { DialogObjectiveEvaluator } from "@/lib/mission/evaluator";
 import { captureSnapshotEvidence } from "@/lib/mission/snapshot";
 
-const objectiveIds: readonly MissionObjectiveId[] = ["identity", "focus", "keyboard", "layout"];
-const checkCodes = {
+const objectiveIds: readonly MissionObjectiveId[] = ["identity", "focus", "keyboard"];
+const checkCodes: Record<MissionObjectiveId, ObjectiveResult["checks"][number]> = {
   identity: "DIALOG_SEMANTICS_VERIFIED",
   focus: "FOCUS_LOOP_VERIFIED",
   keyboard: "ESCAPE_AND_RETURN_VERIFIED",
   layout: "ACTION_LAYOUT_VERIFIED",
-} as const;
+  "motion-timing": "MOTION_TIMING_VERIFIED", "motion-safety": "REDUCED_MOTION_VERIFIED",
+  "stream-protocol": "EVENT_STREAM_VERIFIED", "stream-recovery": "STREAM_RECOVERY_VERIFIED",
+  "state-update": "IMMUTABLE_UPDATE_VERIFIED", "state-reset": "STATE_RESET_VERIFIED",
+};
 
 const result = (objectiveId: MissionObjectiveId, passed: boolean): ObjectiveResult => ({
   objectiveId,
@@ -36,7 +40,7 @@ const result = (objectiveId: MissionObjectiveId, passed: boolean): ObjectiveResu
   checks: passed ? [checkCodes[objectiveId]] : [],
   failureCodes: passed
     ? []
-    : [objectiveId === "identity" ? "DIALOG_IDENTITY_MISSING" : objectiveId === "focus" ? "FOCUS_CONTAINMENT_MISSING" : objectiveId === "keyboard" ? "KEYBOARD_ACTIONS_MISSING" : "ACTION_LAYOUT_BROKEN"],
+    : [objectiveId === "identity" ? "DIALOG_IDENTITY_MISSING" : objectiveId === "focus" ? "FOCUS_CONTAINMENT_MISSING" : objectiveId === "keyboard" ? "KEYBOARD_ACTIONS_MISSING" : objectiveId === "layout" ? "ACTION_LAYOUT_BROKEN" : objectiveId === "motion-timing" ? "MOTION_TIMING_BROKEN" : objectiveId === "motion-safety" ? "REDUCED_MOTION_MISSING" : objectiveId === "stream-protocol" ? "EVENT_STREAM_BROKEN" : objectiveId === "stream-recovery" ? "STREAM_RECOVERY_BROKEN" : objectiveId === "state-update" ? "STATE_MUTATION_BROKEN" : "STATE_RESET_BROKEN"],
 });
 
 const snapshotFor = (attemptNumber: number, objectives: ObjectiveResult[]): SnapshotEvidence => ({
@@ -85,13 +89,13 @@ describe("allowlisted Code Lab", () => {
 
   it("generates a line-level before/after diff and resets to the broken values", () => {
     const diff = diffDialogCode(brokenDialogCode, repairedDialogCode);
-    expect(diff.some((line) => line.kind === "removed" && line.text.includes("role={undefined}"))).toBe(true);
-    expect(diff.some((line) => line.kind === "added" && line.text.includes('role="dialog"'))).toBe(true);
+    expect(diff.some((line) => line.kind === "removed" && line.text.includes('role: "none"'))).toBe(true);
+    expect(diff.some((line) => line.kind === "added" && line.text.includes('role: "dialog"'))).toBe(true);
     expect(new AllowlistedDialogCodeLab().reset()).toEqual(brokenDialogCode);
   });
 
   it("keeps every curated broken setup inside the typed allowlist", () => {
-    expect(dialogPresets.map((preset) => preset.id)).toEqual(["everything-missing", "unnamed-modal", "layout-collapse", "vertical-actions", "misaligned-actions", "cramped-actions", "keyboard-trap"]);
+    expect(dialogPresets.map((preset) => preset.id)).toEqual(["everything-missing", "unnamed-modal", "keyboard-trap", "layout-collapse", "vertical-actions", "misaligned-actions", "cramped-actions", "motion-marathon", "motion-no-fallback", "stream-buffered", "stream-reconnect-loop", "state-mutation", "state-stale-reset"]);
     for (const preset of dialogPresets) {
       expect(validateDialogCodeState(preset.code)).toEqual({ ok: true, value: preset.code });
     }
@@ -103,21 +107,21 @@ describe("battle domain", () => {
     expect(initialBattleState).toMatchObject({ phase: "landing", hp: 100, fixture: "broken", results: [], history: [], xpEarned: 0, combo: 0 });
     const identityOnly = objectiveIds.map((id) => result(id, id === "identity"));
     const first = battleReducer(initialBattleState, { type: "RESULTS", result: verification(1, identityOnly) });
-    expect(first.hp).toBe(75);
+    expect(first.hp).toBe(70);
     expect(first.verifiedObjectiveIds).toEqual(["identity"]);
-    expect(first).toMatchObject({ xpEarned: 75, combo: 1, attempt: 2 });
-    expect(first.lastHit).toMatchObject({ damage: 25, xp: 75, accessibilityCriticalHit: true });
+    expect(first).toMatchObject({ xpEarned: 90, combo: 1, attempt: 2 });
+    expect(first.lastHit).toMatchObject({ damage: 30, xp: 90, accessibilityCriticalHit: true });
 
     const repeated = battleReducer(first, { type: "RESULTS", result: verification(2, identityOnly) });
-    expect(repeated.hp).toBe(75);
+    expect(repeated.hp).toBe(70);
     expect(repeated.history).toHaveLength(2);
-    expect(repeated).toMatchObject({ xpEarned: 75, combo: 0, lastHit: null, attempt: 3 });
+    expect(repeated).toMatchObject({ xpEarned: 90, combo: 0, lastHit: null, attempt: 3 });
 
     const focusOnly = objectiveIds.map((id) => result(id, id === "focus"));
     const next = battleReducer(repeated, { type: "RESULTS", result: verification(3, focusOnly) });
-    expect(next.hp).toBe(50);
+    expect(next.hp).toBe(35);
     expect(next.verifiedObjectiveIds).toEqual(["identity", "focus"]);
-    expect(next).toMatchObject({ xpEarned: 150, combo: 1 });
+    expect(next).toMatchObject({ xpEarned: 195, combo: 1 });
   });
 
   it("clears verification rewards when a new broken setup is loaded", () => {
@@ -132,26 +136,26 @@ describe("battle domain", () => {
     const first = battleReducer(initialBattleState, { type: "RESULTS", result: verification(1, identityOnly) });
     const remaining = objectiveIds.map((id) => result(id, id !== "identity"));
     const victory = battleReducer(first, { type: "RESULTS", result: verification(2, remaining) });
-    expect(victory).toMatchObject({ phase: "victory", xpEarned: 300, combo: 4, rank: "A", perfectRepair: false, attempt: 3 });
+    expect(victory).toMatchObject({ phase: "victory", xpEarned: 300, combo: 3, rank: "A", perfectRepair: false, attempt: 3 });
     expect(victory.history).toHaveLength(2);
-    expect(victory.lastHit).toMatchObject({ damage: 75, xp: 225, combo: 4 });
+    expect(victory.lastHit).toMatchObject({ damage: 70, xp: 210, combo: 3 });
 
     const perfect = battleReducer(initialBattleState, {
       type: "RESULTS",
       result: verification(1, objectiveIds.map((id) => result(id, true))),
     });
-    expect(perfect).toMatchObject({ phase: "victory", hp: 0, xpEarned: 300, combo: 4, rank: "S", perfectRepair: true });
+    expect(perfect).toMatchObject({ phase: "victory", hp: 0, xpEarned: 300, combo: 3, rank: "S", perfectRepair: true });
     expect(rankForAttempts(2)).toBe("A");
     expect(rankForAttempts(3)).toBe("B");
     expect(rankForAttempts(4)).toBe("C");
-    expect(xpForObjectives(["identity", "focus", "keyboard", "layout"])).toBe(300);
+    expect(xpForObjectives(["identity", "focus", "keyboard"], keyboardTrapObjectives)).toBe(300);
   });
 
   it("keeps independent failures visible and completes only through verified results", () => {
     const mixed = objectiveIds.map((id) => result(id, id !== "focus"));
-    expect(mixed.map((item) => item.status)).toEqual(["passed", "failed", "passed", "passed"]);
-    expect(bossHealth(mixed)).toBe(25);
-    expect(missionComplete(["identity", "keyboard", "layout"])).toBe(false);
+    expect(mixed.map((item) => item.status)).toEqual(["passed", "failed", "passed"]);
+    expect(bossHealth(mixed, keyboardTrapObjectives)).toBe(35);
+    expect(missionComplete(["identity", "keyboard"], keyboardTrapObjectives)).toBe(false);
     const partial = battleReducer(initialBattleState, { type: "RESULTS", result: verification(1, mixed) });
     expect(partial.phase).toBe("partial-success");
     const final = battleReducer(partial, { type: "RESULTS", result: verification(2, objectiveIds.map((id) => result(id, id === "focus"))) });
@@ -243,8 +247,8 @@ describe("rendered behavior evaluation and snapshot evidence", () => {
   it("runs real independent dialog behavior checks", async () => {
     const root = renderFixture({ ...repairedDialogCode, focusContainment: false });
     const evaluator = new DialogObjectiveEvaluator();
-    const objectives = await evaluator.evaluate(root);
-    expect(objectives.map((objective) => objective.status)).toEqual(["passed", "failed", "passed", "passed"]);
+    const objectives = await evaluator.evaluate(root, "delete-dialog");
+    expect(objectives.map((objective) => objective.status)).toEqual(["passed", "failed", "passed"]);
     expect(root.querySelector("[data-testid='mission-dialog']")).not.toBeNull();
     await evaluator.cleanup(root);
     expect(root.querySelector("[data-testid='mission-dialog']")).toBeNull();

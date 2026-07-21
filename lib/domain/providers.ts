@@ -1,16 +1,17 @@
 import type {
   DialogCodeState,
   MissionObjectiveId,
+  MissionScenarioId,
   ObjectiveResult,
   SnapshotEvidence,
 } from "@/lib/domain/mission";
 import { validateDialogCodeState } from "@/lib/mission/code-lab";
 
-export const coachMissionIds = ["keyboard-trap", "flex-tangle"] as const;
+export const coachMissionIds = ["keyboard-trap", "flex-tangle", "motion-phantom", "stream-gremlin", "state-doppelganger"] as const;
 export type CoachMissionId = (typeof coachMissionIds)[number];
 export const coachMissionId: CoachMissionId = "keyboard-trap";
 const isCoachMissionId = (value: unknown): value is CoachMissionId =>
-  value === "keyboard-trap" || value === "flex-tangle";
+  value === "keyboard-trap" || value === "flex-tangle" || value === "motion-phantom" || value === "stream-gremlin" || value === "state-doppelganger";
 export const maxCoachImageBytes = 512_000;
 export const maxCoachRequestBytes = 1_750_000;
 
@@ -48,7 +49,7 @@ export interface CoachProvider {
 }
 
 export interface ObjectiveEvaluator {
-  evaluate(root: HTMLElement): Promise<ObjectiveResult[]>;
+  evaluate(root: HTMLElement, scenarioId: MissionScenarioId): Promise<ObjectiveResult[]>;
   cleanup(root: HTMLElement): Promise<void>;
 }
 
@@ -72,7 +73,14 @@ export type CoachOutputValidation =
   | { ok: true; value: CoachStructuredOutput }
   | { ok: false };
 
-const objectiveIds: readonly MissionObjectiveId[] = ["identity", "focus", "keyboard", "layout"];
+const objectiveIds: readonly MissionObjectiveId[] = [
+  "identity", "focus", "keyboard", "layout", "motion-timing", "motion-safety",
+  "stream-protocol", "stream-recovery", "state-update", "state-reset",
+];
+const isMissionObjectiveId = (value: unknown): value is MissionObjectiveId =>
+  value === "identity" || value === "focus" || value === "keyboard" || value === "layout" ||
+  value === "motion-timing" || value === "motion-safety" || value === "stream-protocol" ||
+  value === "stream-recovery" || value === "state-update" || value === "state-reset";
 const inputFields = [
   "missionId",
   "failedObjectiveIds",
@@ -173,7 +181,7 @@ export function validateCoachInput(input: unknown): CoachInputValidation {
   for (let index = 0; index < failedObjectiveIds.length; index += 1) {
     const id = read(failedObjectiveIds, String(index));
     if (
-      (id !== "identity" && id !== "focus" && id !== "keyboard" && id !== "layout") ||
+      !isMissionObjectiveId(id) ||
       requestedObjectives.some((objectiveId) => objectiveId === id)
     ) return { ok: false, error: "INVALID_OBJECTIVES" };
     requestedObjectives.push(id);
@@ -222,12 +230,42 @@ export function validateCoachStructuredOutput(input: unknown): CoachOutputValida
 const hintLevelForAttempt = (attemptNumber: number): 1 | 2 | 3 =>
   attemptNumber <= 1 ? 1 : attemptNumber === 2 ? 2 : 3;
 
+const advancedCopyFor = (
+  locale: "ko" | "en",
+  objectiveId: Exclude<MissionObjectiveId, "identity" | "focus" | "keyboard" | "layout">,
+  level: 1 | 2 | 3,
+): CoachStructuredOutput => {
+  const detail = level === 1 ? "" : level === 2 ? " Check the highlighted values together." : " Repair every highlighted value, then verify again.";
+  const detailKo = level === 1 ? "" : level === 2 ? " 표시된 값을 함께 확인하세요." : " 표시된 값을 모두 고친 뒤 다시 검사하세요.";
+  if (locale === "en") {
+    switch (objectiveId) {
+      case "motion-timing": return { observation: "The card travels too far for too long, so its feedback feels sluggish and distracting.", hint: `Use the short distance and 1.2 second duration.${detail}`, whyItMatters: "Brief, restrained motion keeps the result connected to the action.", inspectNext: "Inspect duration and travel distance in Motion.", bossTaunt: "Catch me after the eight-second detour!" };
+      case "motion-safety": return { observation: "The animation has no reduced-motion alternative.", hint: `Enable the reduced-motion fallback.${detail}`, whyItMatters: "People who reduce motion should receive the same outcome without sweeping movement.", inspectNext: "Inspect the reduced-motion setting.", bossTaunt: "My motion never stops!" };
+      case "stream-protocol": return { observation: "The AI reply waits for the whole response instead of revealing safe event chunks.", hint: `Choose event-stream delivery and event-line parsing.${detail}`, whyItMatters: "Correct framing makes partial AI output readable and predictable.", inspectNext: "Run the simulated reply and inspect protocol plus parsing.", bossTaunt: "I swallowed every token until the end!" };
+      case "stream-recovery": return { observation: "A dropped stream can retry forever and duplicate work.", hint: `Use bounded reconnect behavior.${detail}`, whyItMatters: "A retry budget prevents runaway requests and gives users a clear recovery state.", inspectNext: "Inspect the reconnect policy.", bossTaunt: "Retry, retry, retry forever!" };
+      case "state-update": return { observation: "The visible count and stored count disagree after an update.", hint: `Use immutable updates with one source of truth.${detail}`, whyItMatters: "Predictable state changes keep every view synchronized.", inspectNext: "Increment once and compare UI with store.", bossTaunt: "Which count is real? I will not tell!" };
+      case "state-reset": return { observation: "Reset leaves stale data behind in one state copy.", hint: `Reset the shared state instead of keeping stale values.${detail}`, whyItMatters: "A real reset must clear every consumer of the state.", inspectNext: "Increment, reset, and compare both counters.", bossTaunt: "Old state always comes back!" };
+    }
+  }
+  switch (objectiveId) {
+    case "motion-timing": return { observation: "카드가 너무 멀리, 너무 오래 움직여 결과 피드백이 느리고 산만합니다.", hint: `짧은 이동 거리와 1.2초 지속 시간을 사용하세요.${detailKo}`, whyItMatters: "짧고 절제된 움직임은 결과와 사용자 동작을 바로 연결합니다.", inspectNext: "애니메이션 탭의 지속 시간과 이동 거리를 확인하세요.", bossTaunt: "8초짜리 우회로에서 날 잡아 봐!" };
+    case "motion-safety": return { observation: "애니메이션에 움직임 줄이기 대안이 없습니다.", hint: `움직임 줄이기 대응을 켜세요.${detailKo}`, whyItMatters: "움직임을 줄이는 사용자도 큰 이동 없이 같은 결과를 받아야 합니다.", inspectNext: "움직임 줄이기 설정을 확인하세요.", bossTaunt: "내 움직임은 절대 멈추지 않아!" };
+    case "stream-protocol": return { observation: "AI 답변이 안전한 이벤트 조각으로 보이지 않고 전체 응답이 끝날 때까지 기다립니다.", hint: `event-stream 전송과 이벤트 줄 파싱을 선택하세요.${detailKo}`, whyItMatters: "올바른 프레이밍은 부분 AI 출력을 읽기 쉽고 예측 가능하게 합니다.", inspectNext: "모의 AI 답변을 실행하고 프로토콜과 파싱을 확인하세요.", bossTaunt: "마지막까지 모든 토큰을 삼켰지!" };
+    case "stream-recovery": return { observation: "연결이 끊기면 스트림이 끝없이 재시도하며 작업을 중복할 수 있습니다.", hint: `제한된 재연결 정책을 사용하세요.${detailKo}`, whyItMatters: "재시도 한도는 폭주 요청을 막고 명확한 복구 상태를 제공합니다.", inspectNext: "재연결 정책을 확인하세요.", bossTaunt: "재시도, 또 재시도, 영원히!" };
+    case "state-update": return { observation: "값을 올린 뒤 화면 수량과 저장 수량이 서로 다릅니다.", hint: `불변 업데이트와 단일 상태 원본을 사용하세요.${detailKo}`, whyItMatters: "예측 가능한 상태 변경은 모든 화면을 동기화합니다.", inspectNext: "한 번 증가시킨 뒤 UI와 저장소 값을 비교하세요.", bossTaunt: "어느 숫자가 진짜인지 맞혀 봐!" };
+    case "state-reset": return { observation: "초기화 뒤에도 한쪽 상태 복사본에 이전 값이 남습니다.", hint: `오래된 값을 유지하지 말고 공유 상태를 초기화하세요.${detailKo}`, whyItMatters: "진짜 초기화는 상태를 사용하는 모든 곳을 비워야 합니다.", inspectNext: "증가, 초기화 후 두 카운터를 비교하세요.", bossTaunt: "이전 상태는 언제나 돌아오지!" };
+  }
+};
+
 const copyFor = (
   locale: "ko" | "en",
   objectiveId: MissionObjectiveId,
   level: 1 | 2 | 3,
 ): CoachStructuredOutput => {
-  const english: Record<MissionObjectiveId, readonly [CoachStructuredOutput, CoachStructuredOutput, CoachStructuredOutput]> = {
+  if (objectiveId === "motion-timing" || objectiveId === "motion-safety" || objectiveId === "stream-protocol" || objectiveId === "stream-recovery" || objectiveId === "state-update" || objectiveId === "state-reset") {
+    return advancedCopyFor(locale, objectiveId, level);
+  }
+  const english: Record<"identity" | "focus" | "keyboard" | "layout", readonly [CoachStructuredOutput, CoachStructuredOutput, CoachStructuredOutput]> = {
     identity: [
       { observation: "The selected snapshot looks like a modal, but the failed identity check says its purpose is not exposed.", hint: "Start by giving the container dialog semantics.", whyItMatters: "Visual placement does not tell assistive technology that focus entered a dialog.", inspectNext: "Inspect the container role and modal state.", bossTaunt: "Looking like a dialog is not the same as being one!" },
       { observation: "Dialog semantics are still incomplete in this attempt.", hint: "Connect the visible title to the dialog with the allowlisted title reference.", whyItMatters: "A dialog needs a programmatic name so users know why it opened.", inspectNext: "Inspect role, aria-modal, and aria-labelledby together.", bossTaunt: "A nameless dialog keeps my trap mysterious!" },
@@ -251,7 +289,7 @@ const copyFor = (
   };
   if (locale === "en") return english[objectiveId][level - 1];
 
-  const korean: Record<MissionObjectiveId, readonly [CoachStructuredOutput, CoachStructuredOutput, CoachStructuredOutput]> = {
+  const korean: Record<"identity" | "focus" | "keyboard" | "layout", readonly [CoachStructuredOutput, CoachStructuredOutput, CoachStructuredOutput]> = {
     identity: [
       { observation: "선택한 스냅샷은 모달처럼 보이지만 정체성 검사가 목적을 전달하지 못했다고 보고합니다.", hint: "컨테이너에 먼저 대화상자 의미를 부여하세요.", whyItMatters: "화면 배치만으로는 보조 기술이 대화상자 진입을 알 수 없습니다.", inspectNext: "컨테이너 role과 모달 상태를 확인하세요.", bossTaunt: "대화상자처럼 보인다고 진짜 대화상자는 아니지!" },
       { observation: "이번 시도에서도 대화상자 의미 계약이 완전하지 않습니다.", hint: "허용된 제목 참조로 보이는 제목을 대화상자에 연결하세요.", whyItMatters: "사용자가 열린 이유를 알 수 있도록 대화상자에는 프로그램 방식의 이름이 필요합니다.", inspectNext: "role, aria-modal, aria-labelledby를 함께 확인하세요.", bossTaunt: "이름 없는 대화상자가 내 함정을 더 미스터리하게 만들지!" },

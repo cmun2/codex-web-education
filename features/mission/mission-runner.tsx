@@ -7,16 +7,15 @@ import { CodeLabPanel } from "@/components/code-lab";
 import { MissionDialog } from "@/components/mission-dialog";
 import { VisualCoach } from "@/components/visual-coach";
 import { battleReducer, initialBattleState, type MissionPhase } from "@/lib/domain/battle";
-import { keyboardTrapObjectives, type MissionObjectiveId, type MissionScenarioId, type ObjectiveResult, type ObjectiveStatus, type VerificationResult } from "@/lib/domain/mission";
+import { type MissionObjective, type MissionObjectiveId, type MissionScenarioId, type ObjectiveResult, type ObjectiveStatus, type VerificationResult } from "@/lib/domain/mission";
 import { type CoachInsight } from "@/lib/domain/providers";
 import { dictionaries, statusLabel, type Locale, type MissionDictionary } from "@/lib/i18n/dictionaries";
 import { getLocaleSnapshot, getServerLocaleSnapshot, selectLocale, subscribeToLocale } from "@/lib/i18n/locale";
 import {
   AllowlistedDialogCodeLab,
   dialogPreset,
-  dialogPresets,
-  isFullyRepaired,
   isRepairFieldResolved,
+  repairFieldsByTab,
   type DialogPresetId,
   type DialogRepairField,
   type RepairProvider,
@@ -42,6 +41,12 @@ const repairFieldsForObjective: Record<MissionObjectiveId, readonly DialogRepair
   focus: ["focusContainment"],
   keyboard: ["escapeCloses", "focusRestoration"],
   layout: ["actionDisplay", "actionDirection", "actionAlign", "actionJustify", "actionGap"],
+  "motion-timing": ["motionDuration", "motionDistance"],
+  "motion-safety": ["reducedMotionSafe"],
+  "stream-protocol": ["streamProtocol", "streamParsing"],
+  "stream-recovery": ["streamReconnect"],
+  "state-update": ["stateUpdate", "stateSource"],
+  "state-reset": ["stateReset", "stateSource"],
 };
 
 function LanguageSwitcher({ locale, copy, onChange }: { locale: Locale; copy: MissionDictionary; onChange: (locale: Locale) => void }) {
@@ -77,10 +82,10 @@ function MissionLoop({ copy }: { copy: MissionDictionary }) {
   );
 }
 
-function ObjectiveList({ copy, results, detailed = false }: { copy: MissionDictionary; results: readonly ObjectiveResult[]; detailed?: boolean }) {
+function ObjectiveList({ copy, objectives, results, detailed = false }: { copy: MissionDictionary; objectives: readonly MissionObjective[]; results: readonly ObjectiveResult[]; detailed?: boolean }) {
   return (
     <ol className="objective-list">
-      {keyboardTrapObjectives.map((objective) => {
+      {objectives.map((objective) => {
         const result = results.find((item) => item.objectiveId === objective.id);
         const status: ObjectiveStatus = result?.status ?? "pending";
         return (
@@ -144,7 +149,7 @@ export function MissionRunner() {
   const copy = dictionaries[locale];
   const scenario = missionScenario(scenarioId);
   const scenarioCopy = copy.missionCatalog[scenarioId];
-  const fixtureCopy = scenarioId === "delete-dialog" ? copy.fixture : copy.fixtureTwo;
+  const fixtureCopy = scenarioId === "delete-dialog" ? copy.fixture : scenarioId === "checkout-sheet" ? copy.fixtureTwo : scenarioId === "motion-card" ? copy.fixtureThree : scenarioId === "ai-stream" ? copy.fixtureFour : copy.fixtureFive;
 
   if (progressionStorageRef.current === null) progressionStorageRef.current = new LocalProgressionStorage();
   if (soundPlayerRef.current === null) soundPlayerRef.current = new WebAudioBattleSoundPlayer();
@@ -213,7 +218,8 @@ export function MissionRunner() {
     setCoachAvailable(false);
     coachRequestRef.current += 1;
     setCodeState(validation.value);
-    dispatch({ type: "CHANGES_APPLIED", fixture: isFullyRepaired(validation.value) ? "repaired" : "modified" });
+    const activeFields = scenario.repairTabs.flatMap((tab) => repairFieldsByTab[tab]);
+    dispatch({ type: "CHANGES_APPLIED", fixture: activeFields.every((field) => isRepairFieldResolved(validation.value, field)) ? "repaired" : "modified" });
   };
 
   const runChecks = async () => {
@@ -224,7 +230,7 @@ export function MissionRunner() {
     setGuidedObjectiveIds([]);
     dispatch({ type: "BEGIN_VERIFICATION" });
     try {
-      const objectiveResults = await objectiveEvaluator.evaluate(rootRef.current);
+      const objectiveResults = await objectiveEvaluator.evaluate(rootRef.current, scenarioId);
       if (!rootRef.current) return;
       const snapshot = captureSnapshotEvidence({
         root: rootRef.current,
@@ -267,10 +273,10 @@ export function MissionRunner() {
   };
 
   const loadNextPreset = () => {
-    const currentIndex = dialogPresets.findIndex((preset) => preset.id === presetId);
-    const nextPreset = dialogPresets[(currentIndex + 1) % dialogPresets.length];
-    setPresetId(nextPreset.id);
-    setCodeState(dialogPreset(nextPreset.id));
+    const currentIndex = scenario.presetIds.findIndex((candidate) => candidate === presetId);
+    const nextPresetId = scenario.presetIds[(currentIndex + 1) % scenario.presetIds.length] ?? scenario.initialPresetId;
+    setPresetId(nextPresetId);
+    setCodeState(dialogPreset(nextPresetId));
     setValidationErrors([]);
     setShowDiff(false);
     setDialogOpen(false);
@@ -283,7 +289,7 @@ export function MissionRunner() {
     setSelectedAttempt(null);
     coachRequestRef.current += 1;
     completionRecordedRef.current = false;
-    dispatch({ type: "NEW_BROKEN_SETUP", fixture: nextPreset.id === "everything-missing" ? "broken" : "modified" });
+    dispatch({ type: "NEW_BROKEN_SETUP", fixture: "broken", objectives: scenario.objectives });
   };
 
   const resetMissionUi = (nextScenarioId: MissionScenarioId = scenarioId) => {
@@ -305,14 +311,15 @@ export function MissionRunner() {
   };
 
   const replayMission = () => {
-    dispatch({ type: "REPLAY" });
+    dispatch({ type: "REPLAY", objectives: scenario.objectives });
     resetMissionUi();
   };
 
   const startScenario = (nextScenarioId: MissionScenarioId) => {
+    const nextScenario = missionScenario(nextScenarioId);
     setScenarioId(nextScenarioId);
     resetMissionUi(nextScenarioId);
-    dispatch({ type: "NEW_BROKEN_SETUP", fixture: "broken" });
+    dispatch({ type: "NEW_BROKEN_SETUP", fixture: "broken", objectives: nextScenario.objectives });
   };
 
   const chooseMission = () => {
@@ -438,7 +445,7 @@ export function MissionRunner() {
               })}
             </div>
             <div className="fresh-status" aria-label={copy.mission.status}>
-              <span>{copy.mission.hp(state.hp)}</span><span>{copy.mission.objectivesProgress(0)}</span><span>{copy.progression.totalXp(progression.totalXp)}</span>
+              <span>{copy.mission.hp(state.hp)}</span><span>{copy.mission.objectivesProgress(0, scenario.objectives.length)}</span><span>{copy.progression.totalXp(progression.totalXp)}</span>
             </div>
             <button className="primary-action start-action" type="button" onClick={() => startScenario(scenarioId)}>{copy.landing.start}: {scenarioCopy.title}</button>
           </header>
@@ -453,12 +460,12 @@ export function MissionRunner() {
             <p className="compact-proposition">{copy.product.proposition}</p>
           </header>
           <div className="status-strip" aria-label={copy.mission.status}>
-            <span>{copy.mission.hp(state.hp)}</span><span>{copy.mission.objectivesProgress(passedCount)}</span><span>{copy.mission.fixtureStatus(state.fixture)}</span><span>{copy.progression.attempts(state.history.length)}</span><span>{copy.progression.xp(state.xpEarned)}</span><span>{copy.progression.combo(state.combo)}</span>
+            <span>{copy.mission.hp(state.hp)}</span><span>{copy.mission.objectivesProgress(passedCount, scenario.objectives.length)}</span><span>{copy.mission.fixtureStatus(state.fixture)}</span><span>{copy.progression.attempts(state.history.length)}</span><span>{copy.progression.xp(state.xpEarned)}</span><span>{copy.progression.combo(state.combo)}</span>
           </div>
 
           <div className="direct-workspace">
             <div className="fixture-stage">
-              <MissionDialog codeState={codeState} copy={fixtureCopy} open={dialogOpen} onOpenChange={setDialogOpen} onPrimary={() => undefined} />
+              <MissionDialog key={`${scenarioId}-${presetId}-${codeState.streamProtocol}-${codeState.streamParsing}-${codeState.streamReconnect}-${codeState.stateUpdate}-${codeState.stateReset}-${codeState.stateSource}`} codeState={codeState} copy={fixtureCopy} objectives={scenario.objectives} scenarioId={scenarioId} open={dialogOpen} onOpenChange={setDialogOpen} onPrimary={() => undefined} />
               <section className="battle battle-perched" aria-labelledby="battle-heading">
                 <h2 id="battle-heading" className="sr-only">{copy.mission.heading}</h2>
                 <div key={`${scenarioId}-${state.lastHit?.attempt ?? 0}`} className={`boss ${state.lastHit ? "boss-hit" : ""} ${state.phase === "victory" ? "boss-defeated" : ""}`} role="img" aria-label={scenarioCopy.bossLabel}>
@@ -478,9 +485,11 @@ export function MissionRunner() {
 
             <div className="repair-side">
               <CodeLabPanel
+                key={scenarioId}
                 copy={copy.codeLab}
                 value={codeState}
                 presetId={presetId}
+                repairTabs={scenario.repairTabs}
                 source={repairProvider.source(codeState, scenario.sourceFunctionName)}
                 diff={repairProvider.diff(codeState, dialogPreset(presetId), scenario.sourceFunctionName)}
                 showDiff={showDiff}
@@ -489,6 +498,7 @@ export function MissionRunner() {
                 highlightedFields={highlightedFields}
                 aiHint={highlightedFields.length > 0 ? copy.codeLab.remainingAiHint : null}
                 verifiedCount={passedCount}
+                objectiveCount={scenario.objectives.length}
                 verifiedXp={state.xpEarned}
                 onChange={updateCode}
                 onNewSetup={loadNextPreset}
@@ -499,7 +509,7 @@ export function MissionRunner() {
               />
               <section className="panel objectives-panel" aria-labelledby="objectives-heading">
                 <h2 id="objectives-heading">{copy.briefing.objectivesHeading}</h2>
-                <ObjectiveList copy={copy} results={state.results} />
+                <ObjectiveList copy={copy} objectives={scenario.objectives} results={state.results} />
                 {coachAvailable && selectedVerification?.objectives.some((result) => result.status === "failed") && (
                   <VisualCoach
                     copy={copy.coach}
@@ -526,7 +536,7 @@ export function MissionRunner() {
             <details className="history-section">
               <summary>{copy.history.heading}</summary>
               <p className="technical-note">{copy.console.deterministic}</p>
-              {state.results.length > 0 && <div className="results-summary"><h3>{copy.results.heading}</h3><ObjectiveList copy={copy} results={state.results} detailed /></div>}
+              {state.results.length > 0 && <div className="results-summary"><h3>{copy.results.heading}</h3><ObjectiveList copy={copy} objectives={scenario.objectives} results={state.results} detailed /></div>}
               <AttemptHistory history={state.history} copy={copy.history} selectedAttempt={selectedAttempt} onSelectAttempt={(attempt) => {
                 setSelectedAttempt(attempt);
                 setCoach(null);
@@ -547,7 +557,7 @@ export function MissionRunner() {
                   {state.perfectRepair && <strong>{copy.progression.perfectRepair}</strong>}
                 </div>
                 <h3>{copy.progression.restoredHeading}</h3>
-                <ul>{keyboardTrapObjectives.map((objective) => <li key={objective.id}>✓ {copy.objectives[objective.id].title}</li>)}</ul>
+                <ul>{scenario.objectives.map((objective) => <li key={objective.id}>✓ {copy.objectives[objective.id].title}</li>)}</ul>
                 <div className="victory-debrief">
                   <h3>{copy.debrief.heading}</h3>
                   <p><strong>{copy.debrief.semanticsHeading}:</strong> {copy.debrief.semantics}</p>
@@ -555,7 +565,7 @@ export function MissionRunner() {
                 </div>
                 <div className="action-row">
                   <button className="primary-action" type="button" onClick={replayMission}>{copy.actions.replay}</button>
-                  {scenarioId === "delete-dialog" && <button className="primary-action" type="button" onClick={() => startScenario("checkout-sheet")}>{copy.actions.nextMission}</button>}
+                  {scenario.number < missionScenarios.length && <button className="primary-action" type="button" onClick={() => { const next = missionScenarios[scenario.number]; if (next) startScenario(next.id); }}>{copy.actions.nextMission}</button>}
                   <button className="secondary-action" type="button" onClick={() => dispatch({ type: "SHOW_DEBRIEF" })}>{copy.actions.seeDebrief}</button>
                   <button className="text-action" type="button" onClick={chooseMission}>{copy.actions.missionMenu}</button>
                 </div>
@@ -569,7 +579,7 @@ export function MissionRunner() {
         <section className="debrief panel" aria-labelledby="debrief-heading">
           <p className="eyebrow">{copy.debrief.eyebrow}</p><h1 id="debrief-heading" ref={phaseHeadingRef} tabIndex={-1}>{copy.debrief.heading}</h1>
           <div className="debrief-grid"><div><h2>{copy.debrief.semanticsHeading}</h2><p>{copy.debrief.semantics}</p></div><div><h2>{copy.debrief.behaviorHeading}</h2><p>{copy.debrief.behavior}</p></div></div>
-          <div className="debrief-score"><span>{copy.mission.hp(state.hp)}</span><span>{copy.mission.objectivesProgress(passedCount)}</span></div>
+          <div className="debrief-score"><span>{copy.mission.hp(state.hp)}</span><span>{copy.mission.objectivesProgress(passedCount, scenario.objectives.length)}</span></div>
           <button className="primary-action" type="button" onClick={replayMission}>{copy.actions.replay}</button>
           <button className="secondary-action" type="button" onClick={chooseMission}>{copy.actions.missionMenu}</button>
         </section>
